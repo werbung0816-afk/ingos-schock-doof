@@ -1552,10 +1552,10 @@ function showSummary(){
     // Show combo clearly: type label + dice values only when informative
 const dl=diceLabel(r.dice,r.combo);
 if(r.combo.type==='schockAus') comboEl.textContent='Schock Aus';
-else if(r.combo.type==='schock') comboEl.textContent=r.combo.label+' '+dl;
+else if(r.combo.type==='schock') comboEl.textContent=r.combo.label; // name already contains the value
 else if(r.combo.type==='general') comboEl.textContent='General '+dl;
 else if(r.combo.type==='strasse') comboEl.textContent='Straße '+dl;
-else comboEl.textContent=dl; // simple: just show dice values once
+else comboEl.textContent=dl; // simple: just show dice values
     const tagEl=document.createElement('div');tagEl.className='sum-tag';
     if(isBest)tagEl.innerHTML='<span style="color:#2ecc71">👑 Bester</span>';
     else if(isWorst){
