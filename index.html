@@ -473,7 +473,7 @@ function initChat(){
 function appendChatMsg(msg){
   const div=document.createElement('div');
   div.className='chat-msg'+(msg.sender===MP.myName?' mine':'');
-  div.innerHTML=`<span class="cn">${msg.sender}:</span><span class="ct">${escHtml(msg.text)}</span>`;
+  div.innerHTML=`<span class="ct">${escHtml(msg.text)}</span><span class="cn" style="margin-left:6px;">— ${escHtml(msg.sender)}</span>`;
   const msgs=document.getElementById('chat-msgs');
   msgs.appendChild(div);
   msgs.scrollTop=msgs.scrollHeight;
@@ -554,7 +554,9 @@ function mpInitWaitChat(){
     const div=document.createElement('div');
     div.style.cssText='font-size:13px;line-height:1.4;';
     const mine=msg.sender===MP.myName;
-    div.innerHTML=`<span style="color:${mine?'#2ecc71':'#d4af37'};font-weight:600;margin-right:4px;">${msg.sender}:</span><span style="color:rgba(232,224,208,.6);">${msg.text.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</span>`;
+    const col=mine?'#2ecc71':'#d4af37';
+    const safeText=msg.text.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    div.innerHTML=`<span style="color:rgba(232,224,208,.65);">${safeText}</span><span style="color:${col};font-weight:600;margin-left:6px;">— ${msg.sender}</span>`;
     const msgs=document.getElementById('wt-chat-msgs');
     if(msgs){msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;}
   });
