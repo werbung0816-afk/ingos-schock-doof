@@ -175,6 +175,74 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   .mitte-wrap{padding:10px 14px 4px;gap:10px;}
   .card{padding:24px 20px;}
 }
+
+/* ── CHAT ── */
+#chat-wrap{
+  position:fixed;bottom:20px;right:16px;z-index:300;
+  display:none;flex-direction:column;
+  width:min(320px,90vw);
+}
+#chat-wrap.active{display:flex;}
+#chat-toggle{
+  align-self:flex-end;
+  background:linear-gradient(135deg,var(--gold3),var(--gold));
+  color:#1a0f00;border:none;border-radius:20px;padding:8px 16px;
+  font-family:'Cinzel',serif;font-size:11px;letter-spacing:2px;
+  cursor:pointer;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.4);
+  display:flex;align-items:center;gap:6px;
+}
+#chat-badge{
+  background:#e74c3c;color:#fff;border-radius:50%;
+  width:16px;height:16px;font-size:10px;display:none;
+  align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;font-weight:700;
+}
+#chat-badge.has-new{display:flex;}
+#chat-panel{
+  background:linear-gradient(160deg,#0b1a0d,#070e08);
+  border:1px solid rgba(212,175,55,.2);border-radius:14px;
+  margin-bottom:8px;overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.7);
+  display:none;flex-direction:column;max-height:340px;
+}
+#chat-panel.open{display:flex;}
+#chat-title{
+  font-family:'Cinzel',serif;font-size:11px;letter-spacing:3px;
+  color:rgba(212,175,55,.6);padding:10px 14px 8px;
+  border-bottom:1px solid rgba(255,255,255,.05);
+}
+#chat-msgs{
+  flex:1;overflow-y:auto;padding:10px 14px;
+  display:flex;flex-direction:column;gap:6px;min-height:100px;
+  scrollbar-width:thin;scrollbar-color:rgba(212,175,55,.2) transparent;
+}
+.chat-msg{font-size:13px;line-height:1.4;}
+.chat-msg .cn{color:var(--gold);font-weight:600;margin-right:4px;}
+.chat-msg .ct{color:var(--text2);}
+.chat-msg.mine .cn{color:#2ecc71;}
+#chat-input-row{display:flex;gap:6px;padding:8px 10px;border-top:1px solid rgba(255,255,255,.05);}
+#chat-input{
+  flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(212,175,55,.2);
+  border-radius:8px;padding:7px 10px;color:var(--text);font-size:13px;
+  font-family:'DM Sans',sans-serif;outline:none;
+}
+#chat-input:focus{border-color:rgba(212,175,55,.4);}
+#chat-send{
+  background:linear-gradient(135deg,var(--gold3),var(--gold));
+  color:#1a0f00;border:none;border-radius:8px;padding:7px 12px;
+  font-weight:700;cursor:pointer;font-size:13px;
+}
+#emoji-bar{
+  display:flex;flex-wrap:wrap;gap:4px;padding:6px 10px 2px;
+  border-bottom:1px solid rgba(255,255,255,.05);
+}
+.emoji-btn{
+  background:none;border:none;cursor:pointer;font-size:18px;
+  padding:2px 3px;border-radius:6px;transition:background .15s;
+  line-height:1;-webkit-tap-highlight-color:transparent;
+}
+.emoji-btn:hover{background:rgba(255,255,255,.1);}
+.emoji-btn:active{background:rgba(255,255,255,.2);}
+
 </style>
 </head>
 <body>
@@ -230,6 +298,16 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   <div class="wt-slots" id="wt-slots"></div>
   <button class="btn-gold" id="btn-mp-start" style="display:none">SPIEL STARTEN →</button>
   <button class="btn-ghost" id="btn-leave">← Verlassen</button>
+  <div id="wt-chat" style="margin-top:16px;border:1px solid rgba(212,175,55,.15);border-radius:12px;overflow:hidden;display:none;flex-direction:column;">
+    <div style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:3px;color:rgba(212,175,55,.45);padding:8px 12px 6px;border-bottom:1px solid rgba(255,255,255,.05);">💬 CHAT</div>
+    <div id="wt-chat-msgs" style="height:120px;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:5px;scrollbar-width:thin;scrollbar-color:rgba(212,175,55,.2) transparent;"></div>
+    <div id="wt-emoji-bar" style="display:flex;flex-wrap:wrap;gap:3px;padding:5px 10px 2px;border-top:1px solid rgba(255,255,255,.04);"></div>
+    <div style="display:flex;gap:6px;padding:7px 10px;border-top:1px solid rgba(255,255,255,.05);">
+      <input id="wt-chat-input" placeholder="Nachricht…" maxlength="120" autocomplete="off"
+        style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(212,175,55,.2);border-radius:8px;padding:7px 10px;color:#e8e0d0;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;">
+      <button id="wt-chat-send" style="background:linear-gradient(135deg,#9a7015,#d4af37);color:#1a0f00;border:none;border-radius:8px;padding:7px 12px;font-weight:700;cursor:pointer;font-size:13px;">→</button>
+    </div>
+  </div>
 </div>
 </div>
 
@@ -328,6 +406,20 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 </div>
 </div>
 
+<!-- CHAT (nur MP) -->
+<div id="chat-wrap">
+  <div id="chat-panel">
+    <div id="chat-title">💬 CHAT</div>
+    <div id="chat-msgs"></div>
+    <div id="emoji-bar"></div>
+    <div id="chat-input-row">
+      <input id="chat-input" placeholder="Nachricht…" maxlength="120" autocomplete="off">
+      <button id="chat-send">→</button>
+    </div>
+  </div>
+  <button id="chat-toggle">💬 Chat <span id="chat-badge"></span></button>
+</div>
+
 <script>
 'use strict';
 window.onerror=function(msg,src,line,col,err){
@@ -350,6 +442,137 @@ const INGO_B64 = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQY
 
 document.querySelectorAll('#ingo-logo,#ingo-hdr').forEach(img=>img.src=INGO_B64);
 
+
+// ═══════════════════════════════════════════════
+// CHAT
+// ═══════════════════════════════════════════════
+let chatOpen=false;
+let chatListener=null;
+let chatUnread=0;
+let chatRef=null;
+
+function initChat(){
+  if(!MP.on||!MP.roomRef)return;
+  chatRef=MP.roomRef.child('chat');
+  document.getElementById('chat-wrap').classList.add('active');
+  // Listen for new messages
+  if(chatListener)chatRef.off('child_added',chatListener);
+  chatListener=chatRef.on('child_added',snap=>{
+    const msg=snap.val();
+    if(!msg)return;
+    appendChatMsg(msg);
+    if(!chatOpen){
+      chatUnread++;
+      const badge=document.getElementById('chat-badge');
+      badge.textContent=chatUnread>9?'9+':chatUnread;
+      badge.classList.add('has-new');
+    }
+  });
+}
+
+function appendChatMsg(msg){
+  const div=document.createElement('div');
+  div.className='chat-msg'+(msg.sender===MP.myName?' mine':'');
+  div.innerHTML=`<span class="cn">${msg.sender}:</span><span class="ct">${escHtml(msg.text)}</span>`;
+  const msgs=document.getElementById('chat-msgs');
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function sendChat(){
+  const inp=document.getElementById('chat-input');
+  const text=inp.value.trim();
+  if(!text||!chatRef)return;
+  chatRef.push({sender:MP.myName,text,ts:Date.now()});
+  inp.value='';
+}
+
+function stopChat(){
+  if(chatRef&&chatListener)chatRef.off('child_added',chatListener);
+  chatListener=null;chatRef=null;chatUnread=0;
+  document.getElementById('chat-wrap').classList.remove('active');
+  document.getElementById('chat-panel').classList.remove('open');
+  document.getElementById('chat-msgs').innerHTML='';
+  document.getElementById('chat-badge').classList.remove('has-new');
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('chat-toggle').addEventListener('click',()=>{
+    chatOpen=!chatOpen;
+    document.getElementById('chat-panel').classList.toggle('open',chatOpen);
+    if(chatOpen){
+      chatUnread=0;
+      const badge=document.getElementById('chat-badge');
+      badge.textContent='';badge.classList.remove('has-new');
+      const msgs=document.getElementById('chat-msgs');
+      msgs.scrollTop=msgs.scrollHeight;
+    }
+  });
+  document.getElementById('chat-send').addEventListener('click',sendChat);
+  document.getElementById('chat-input').addEventListener('keydown',e=>{
+    if(e.key==='Enter')sendChat();
+  });
+  // Emoji picker
+  const emojiBar=document.getElementById('emoji-bar');
+  ['😁', '🥲', '😰', '🥳', '🫣', '🤔', '🤓', '🤪', '💩', '👌', '🥱', '🍻', '🍺', '😂', '🎲', '🙏', '👀', '🪩', '🕺', '😎', '🎁', '🧐', '🙌'].forEach(em=>{
+    const b=document.createElement('button');
+    b.className='emoji-btn';b.textContent=em;b.title=em;
+    b.addEventListener('click',()=>{
+      const inp=document.getElementById('chat-input');
+      inp.value+=em;inp.focus();
+    });
+    emojiBar.appendChild(b);
+  });
+});
+
+
+function mpInitWaitChat(){
+  const chatDiv=document.getElementById('wt-chat');
+  if(!chatDiv||!MP.roomRef)return;
+  chatDiv.style.display='flex';
+  document.getElementById('wt-chat-msgs').innerHTML='';
+
+  // Emoji bar
+  const eb=document.getElementById('wt-emoji-bar');
+  eb.innerHTML='';
+  ['😁', '🥲', '😰', '🥳', '🫣', '🤔', '🤓', '🤪', '💩', '👌', '🥱', '🍻', '🍺', '😂', '🎲', '🙏', '👀', '🪩', '🕺', '😎', '🎁', '🧐', '🙌'].forEach(em=>{
+    const b=document.createElement('button');
+    b.className='emoji-btn';b.textContent=em;
+    b.style.cssText='background:none;border:none;cursor:pointer;font-size:16px;padding:2px 3px;border-radius:5px;-webkit-tap-highlight-color:transparent;';
+    b.addEventListener('click',()=>{
+      const inp=document.getElementById('wt-chat-input');
+      inp.value+=em;inp.focus();
+    });
+    eb.appendChild(b);
+  });
+
+  // Listen for chat messages
+  MP.roomRef.child('chat').on('child_added',snap=>{
+    const msg=snap.val();if(!msg)return;
+    const div=document.createElement('div');
+    div.style.cssText='font-size:13px;line-height:1.4;';
+    const mine=msg.sender===MP.myName;
+    div.innerHTML=`<span style="color:${mine?'#2ecc71':'#d4af37'};font-weight:600;margin-right:4px;">${msg.sender}:</span><span style="color:rgba(232,224,208,.6);">${msg.text.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</span>`;
+    const msgs=document.getElementById('wt-chat-msgs');
+    if(msgs){msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;}
+  });
+
+  function sendWtChat(){
+    const inp=document.getElementById('wt-chat-input');
+    const text=inp.value.trim();if(!text||!MP.roomRef)return;
+    MP.roomRef.child('chat').push({sender:MP.myName||'?',text,ts:Date.now()});
+    inp.value='';
+  }
+  const sendBtn=document.getElementById('wt-chat-send');
+  const inp=document.getElementById('wt-chat-input');
+  // Remove old listeners to avoid duplicates
+  sendBtn.replaceWith(sendBtn.cloneNode(true));
+  inp.replaceWith(inp.cloneNode(true));
+  document.getElementById('wt-chat-send').addEventListener('click',sendWtChat);
+  document.getElementById('wt-chat-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendWtChat();});
+}
 // ═══════════════════════════════════════════════
 // FIREBASE
 // ═══════════════════════════════════════════════
@@ -400,10 +623,31 @@ const MP={
         }
         const raw=fixGS(room.state);
         if(!G||raw.ts>=(G.ts||0)){ // >= so host sees own echo
+          // Detect rolls by others → play sound + animate cup on this device
+          if(G&&G.playerStates&&raw.playerStates){
+            for(let _pi=0;_pi<raw.playerStates.length;_pi++){
+              if(_pi===ME)continue;
+              const _oldT=(G.playerStates[_pi]&&G.playerStates[_pi].throwNum)||0;
+              const _newT=(raw.playerStates[_pi]&&raw.playerStates[_pi].throwNum)||0;
+              if(_newT>_oldT){
+                playRoll();
+                const _cup=document.getElementById('cup-static');
+                const _gif=document.getElementById('cup-gif');
+                if(_cup&&_gif){
+                  _cup.style.display='none';_gif.style.display='block';
+                  const _s=_gif.src;_gif.src='';_gif.src=_s;
+                  clearTimeout(_gif._t);
+                  _gif._t=setTimeout(()=>{_gif.style.display='none';_cup.style.display='block';},700);
+                }
+                break; // one sound per update is enough
+              }
+            }
+          }
           const oldPhase=G?G.phase:'';
           G=raw;NP=G.players.length;
           showScreen('game');
           render();
+          if(MP.on&&!document.getElementById('chat-wrap').classList.contains('active'))initChat();
           if(G.phase!==oldPhase||G.phase==='summary')handlePhaseChange(G.phase);
           if(MP.host)MP.schedAI();
         }
@@ -696,7 +940,7 @@ function doLaden(playerIdx){
     // Show result for 1.5s, then start rolling
     let best=-1,bestVal=0;
     G.ladenDice.forEach((v,i)=>{if(v>bestVal){bestVal=v;best=i;}});
-    G.message=`Höchste Zahl: ${G.players[best]?.name} mit ${G.ladenDice[best]}! Startet die Runde.`;
+    G.message=`Höchste Zahl: ${G.players[best]?.name} mit ${G.ladenDice[best]}! beginnt die Runde.`;
     if(MP.on)MP.push();
     render();
     setTimeout(()=>{
@@ -915,7 +1159,7 @@ function startNextHalf(){
     G.firstInRound=st;G.currentTurn=st;G.phase='rolling';
     NP=G.players.length;
     G.playerStates=mkPS(NP);G.throwsAllowed=3;G.firstPlayerDone=false;
-    G.message=`2. Hälfte! ${G.players[st]?.name||'?'} beginnt.`;
+    G.message=`2. Hälfte — ${G.players[st]?.name||'?'} beginnt.`;
   } else {
     // Finale
     G.half='finale';
@@ -925,7 +1169,7 @@ function startNextHalf(){
     G.firstInRound=st;G.currentTurn=st;G.phase='rolling';
     NP=G.players.length;
     G.playerStates=mkPS(NP);G.throwsAllowed=3;G.firstPlayerDone=false;
-    G.message=`Finale! ${G.players[st]?.name||'?'} beginnt.`;
+    G.message=`Finale — ${G.players[st]?.name||'?'} beginnt.`;
   }
   G.round++;
   if(MP.on)MP.push();
@@ -1240,7 +1484,7 @@ function renderCup(){
     throwsEl.textContent=`${throwsLeft} Wurf${throwsLeft!==1?'e':''} übrig`;
   } else {
     const firstPlayer=G.players[G.firstInRound];
-    const limitNote=G.firstPlayerDone&&G.throwsAllowed<3?` (${firstPlayer.name} spielt vor)`:'';
+    const limitNote=G.firstPlayerDone&&G.throwsAllowed<3?` (${firstPlayer.name} hat vorgespielt)`:'';
     throwsEl.textContent=`${limit} Würfe verfügbar${limitNote}`;
   }
 
@@ -1371,7 +1615,7 @@ function showHalfEnd(){
     const halfLabel=G.half===1?'1.':'2.';
     t.textContent=`Ende der ${halfLabel} Hälfte`;
     c.innerHTML=`<b style="color:#e74c3c">${loserName}</b> verliert die ${halfLabel} Hälfte.<br><br>
-      Weiter zur ${G.half===1?'2. Hälfte':'Finale'}!`;
+      Weiter zur ${G.half===1?'2. Hälfte':'Finalrunde'}!`;
   }
 
   // btn-next-half: only host can advance
@@ -1400,9 +1644,17 @@ function showGameOver(){
   const loserIdx=G.gameLoser;
   const loserName=G.players[loserIdx]?G.players[loserIdx].name:'?';
   const winners=G.players.filter((_,i)=>i!==loserIdx).map(p=>p.name);
+  const winnersText=winners.length===1
+    ?`${winners[0]} gewinnt`
+    :`${winners.join(' und ')} gewinnen`;
+  // Different text: both halves lost (kalt erwischt) vs Finale loser
+  const doppelt=G.halfLosers[0]!==null&&G.halfLosers[1]!==null&&G.halfLosers[0]===G.halfLosers[1];
+  const loserText=doppelt
+    ?`Glückwunsch, kalt erwischt! ${loserName} bestellt für alle ein Wolters mit einem Lächeln. 🍺`
+    :`${loserName} verliert die gesamte Runde und bestellt herzensgerne ein Wolters für alle. 🍺`;
   document.getElementById('gameover-content').innerHTML=
-    `<b style="color:#e74c3c;font-size:17px">${loserName} verliert die gesamte Runde und bestellt herzensgerne ein Wolters für die gesamte Runde.</b><br><br>
-     <span style="color:#2ecc71">${winners.join(' und ')} gewinnen! 🎉</span>`;
+    `<b style="color:#e74c3c;font-size:17px">${loserText}</b><br><br>
+     <span style="color:#2ecc71">${winnersText}! 🎉</span>`;
   closeModal('modal-summary');closeModal('modal-halfend');openModal('modal-gameover');
 }
 
@@ -1464,7 +1716,7 @@ async function mpCreate(){
   document.getElementById('wt-code').textContent=MP.roomCode;
   document.getElementById('wt-url').textContent=location.href.split('?')[0]+'?join='+MP.roomCode;
   document.getElementById('btn-mp-start').style.display='block';
-  showScreen('waiting');MP.listen();
+  showScreen('waiting');MP.listen();mpInitWaitChat();
 }
 
 // ── MP JOIN ──
@@ -1487,7 +1739,7 @@ async function mpJoin(){
   await MP.roomRef.child('players').set(rp);
   document.getElementById('wt-code').textContent=code;
   document.getElementById('wt-url').textContent=location.href.split('?')[0]+'?join='+code;
-  showScreen('waiting');MP.listen();
+  showScreen('waiting');MP.listen();mpInitWaitChat();
 }
 
 function mpRenderWaiting(room){
@@ -1537,6 +1789,7 @@ async function mpHostStart(){
   };
   await MP.roomRef.update({status:'playing',players,state:JSON.parse(JSON.stringify(G))});
   showScreen('game');render();MP.schedAI();
+  initChat();
 }
 
 // ═══════════════════════════════════════════════
@@ -1559,7 +1812,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('btn-mp-start').addEventListener('click',mpHostStart);
   document.getElementById('btn-leave').addEventListener('click',()=>{MP.stop();showScreen('lobby');});
   document.getElementById('btn-new-game').addEventListener('click',()=>{
-    closeModal('modal-gameover');G=null;MP.stop();showScreen('lobby');
+    closeModal('modal-gameover');G=null;stopChat();MP.stop();showScreen('lobby');
   });
   document.getElementById('btn-next-half').addEventListener('click',()=>{
     if(MP.host||!MP.on)startNextHalf();
