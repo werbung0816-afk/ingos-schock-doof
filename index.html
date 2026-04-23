@@ -1291,13 +1291,7 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
 function showSummary(){
   if(!G||!G.lastResults||!G.lastResults.length)return;
   const modal=document.getElementById('modal-summary');
-  if(modal.classList.contains('open')){
-    // Already open — just update btn visibility without re-rendering content
-    const btn=document.getElementById('btn-next-round');
-    if(MP.on&&!MP.host){btn.style.display='none';btn.disabled=true;}
-    else{btn.style.display='block';btn.disabled=false;}
-    return; // don't re-render if already showing
-  }
+  // Always re-render — ensures guests see full content
   const c=document.getElementById('summary-content');c.innerHTML='';
   // Remove any previously inserted wait texts
   modal.querySelectorAll('.mp-wait-info').forEach(el=>el.remove());
