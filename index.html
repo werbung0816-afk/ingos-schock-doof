@@ -289,7 +289,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   <div class="divider"></div>
   <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:4px;color:rgba(212,175,55,.4);margin-bottom:8px">💬 LOBBY CHAT</div>
   <div style="font-size:11px;color:rgba(255,255,255,.25);margin-bottom:8px;">Koordiniert euch & teilt Raumcodes</div>
-  <div id="lobby-chat-msgs" style="height:130px;overflow-y:auto;background:rgba(0,0,0,.15);border:1px solid rgba(212,175,55,.1);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:5px;margin-bottom:8px;scrollbar-width:thin;scrollbar-color:rgba(212,175,55,.2) transparent;"></div>
+  <div id="lobby-chat-msgs" style="height:110px;overflow-y:auto;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:5px;margin-bottom:8px;scrollbar-width:thin;scrollbar-color:rgba(212,175,55,.2) transparent;cursor:default;"></div>
   <div id="lobby-emoji-bar" style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;"></div>
   <div style="display:flex;gap:8px;">
     <input id="lobby-chat-input" class="lb-input" placeholder="Nachricht…" maxlength="120" style="flex:1;" autocomplete="off">
@@ -605,8 +605,7 @@ function mpInitWaitChat(){
 function initLobbyChat(){
   let db;try{db=getDB();}catch(e){return;}
   if(!db)return;
-  const lobbyRef=db.ref('lobby_chat');
-  const msgs=document.getElementById('lobby-chat-msgs');
+  const lobbyRef=db.ref('sd_lobby_chat'); // sd_ prefix = schock doof
   // Emoji bar
   const eb=document.getElementById('lobby-emoji-bar');
   if(eb){
@@ -627,7 +626,10 @@ function initLobbyChat(){
   // Load last 30 messages
   lobbyRef.limitToLast(30).on('child_added',snap=>{
     const msg=snap.val();if(!msg)return;
+    const msgs=document.getElementById('lobby-chat-msgs');
     if(!msgs)return;
+    // Remove placeholder
+    const ph=document.getElementById('lobby-placeholder');if(ph)ph.remove();
     const div=document.createElement('div');
     div.style.cssText='font-size:12px;line-height:1.4;';
     const safeText=String(msg.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
@@ -640,9 +642,16 @@ function initLobbyChat(){
   lobbyRef.orderByChild('ts').endAt(cutoff).once('value',snap=>{
     snap.forEach(child=>child.ref.remove());
   });
+  // Show placeholder until messages load
+  const msgs=document.getElementById('lobby-chat-msgs');
+  if(msgs&&msgs.children.length===0){
+    const ph=document.createElement('div');ph.id='lobby-placeholder';
+    ph.style.cssText='color:rgba(255,255,255,.2);font-size:11px;font-style:italic;padding:4px 0;';
+    ph.textContent='Lade Nachrichten…';msgs.appendChild(ph);
+  }
+
   function sendLobby(){
     const inp=document.getElementById('lobby-chat-input');
-    // Use the solo-name field as sender name
     const nameEl=document.getElementById('solo-name');
     const name=(nameEl&&nameEl.value.trim())||'Gast';
     const text=inp?inp.value.trim():'';
