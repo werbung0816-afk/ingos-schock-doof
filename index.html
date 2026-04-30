@@ -391,6 +391,18 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   <div class="throws-left" id="throws-left"></div>
   <div class="action-row" id="action-row"></div>
 </div>
+
+<!-- INLINE CHAT (MP only) -->
+<div id="inline-chat" style="display:none;">
+  <div id="inline-chat-latest" title="Chat öffnen/schließen">Tippe um zu chatten…</div>
+  <div id="inline-chat-panel">
+    <div id="inline-chat-msgs"></div>
+    <div id="inline-emoji-bar"></div>
+    <div id="inline-chat-input-row">
+      <input id="inline-chat-input" placeholder="Nachricht…" maxlength="120" autocomplete="off">
+      <button id="inline-chat-send">→</button>
+    </div>
+  </div>
 </div>
 
 <!-- MODALS -->
@@ -1004,7 +1016,7 @@ function schedAI(){
 // ═══════════════════════════════════════════════
 function doLaden(playerIdx){
   if(G.phase!=='laden')return;
-  if(G.ladenDice[playerIdx]!==null)return;
+  if(G.ladenDice[playerIdx]!=null)return; // != catches undefined too (Firebase drops nulls)
   G.ladenDice[playerIdx]=Math.ceil(Math.random()*6);
   // Show GIF for laden roll too
   const _lcs=document.getElementById('cup-static');const _lcg=document.getElementById('cup-gif');
