@@ -187,8 +187,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   .mitte-wrap{padding:10px 14px 4px;gap:10px;}
   .card{padding:24px 20px;}
   /* Chat button on mobile */
-  #chat-wrap{top:64px;right:0;width:min(280px,92vw);}
-  #chat-toggle{font-size:9px;padding:6px 11px;letter-spacing:1px;}
+  
 }
 /* iPhone notch / home bar safe area — only header offset */
 @supports(padding-bottom:env(safe-area-inset-bottom)){
@@ -446,45 +445,8 @@ document.querySelectorAll('#ingo-logo,#ingo-hdr').forEach(img=>img.src=INGO_B64)
 let chatOpen=false;
 let chatListener=null;
 let chatUnread=0;
-let chatRef=null;
-
-function initChat(){
-  if(!MP.on||!MP.roomRef)return;
-  chatRef=MP.roomRef.child('chat');
-  document.getElementById('chat-wrap').classList.add('active');
-  // Listen for new messages
-  if(chatListener)chatRef.off('child_added',chatListener);
-  chatListener=chatRef.on('child_added',snap=>{
-    const msg=snap.val();
-    if(!msg)return;
-    appendChatMsg(msg);
-    if(!chatOpen){
-      chatUnread++;
-      const badge=document.getElementById('chat-badge');
-      badge.textContent=chatUnread>9?'9+':chatUnread;
-      badge.classList.add('has-new');
-    }
-  });
-}
-
-function appendChatMsg(msg){
-  const div=document.createElement('div');
-  div.className='chat-msg'+(msg.sender===MP.myName?' mine':'');
-  div.innerHTML=`<span class="ct">${escHtml(msg.text)}</span><span class="cn" style="margin-left:6px;">— ${escHtml(msg.sender)}</span>`;
-  const msgs=document.getElementById('chat-msgs');
-  msgs.appendChild(div);
-  msgs.scrollTop=msgs.scrollHeight;
-}
-
 function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-function sendChat(){
-  const inp=document.getElementById('chat-input');
-  const text=inp.value.trim();
-  if(!text||!chatRef)return;
-  chatRef.push({sender:MP.myName,text,ts:Date.now()});
-  inp.value='';
-}
 
 function stopChat(){
   if(_chatRef&&_chatListener){_chatRef.off('child_added',_chatListener);_chatListener=null;}
@@ -688,7 +650,7 @@ const MP={
           showScreen('game');
           render();
           if(MP.on&&typeof initGameChat==='function')initGameChat();
-          if(MP.on&&!document.getElementById('chat-wrap').classList.contains('active'))initChat();
+          if(MP.on&&typeof initGameChat==='function')initGameChat();
           if(G.phase!==oldPhase||G.phase==='summary')handlePhaseChange(G.phase);
           if(MP.host)MP.schedAI();
         }
@@ -994,8 +956,8 @@ function doLaden(playerIdx){
     return;
   } else {
     // Find next in randomized laden order
-    const nextInOrder=(G.ladenOrder||[]).find(i=>G.ladenDice[i]===null);
-    const next=nextInOrder!==undefined?nextInOrder:G.ladenDice.findIndex(d=>d===null);
+    const nextInOrder=(G.ladenOrder||[]).find(i=>G.ladenDice[i]==null); // == catches undefined
+    const next=nextInOrder!=null?nextInOrder:G.ladenDice.findIndex(d=>d==null);
     G.currentTurn=next;
     G.message=G.players[next]?`${G.players[next].name} würfelt…`:'';
   }
@@ -1409,7 +1371,7 @@ function render(){
     const diceDiv=document.createElement('div');diceDiv.className='pcard-dice';
 
     if(G.phase==='laden'){
-      if(G.ladenDice[i]!==null) diceDiv.appendChild(makeDie(G.ladenDice[i],{size:'sm'}));
+      if(G.ladenDice[i]!=null) diceDiv.appendChild(makeDie(G.ladenDice[i],{size:'sm'}));
       else if(isActive) diceDiv.innerHTML='<span style="color:rgba(255,255,255,.2);font-size:12px">—</span>';
     } else if(ps){
       if(isMe){
@@ -1847,13 +1809,15 @@ async function mpHostStart(){
     throwsAllowed:3,firstPlayerDone:false,
     playerStates:mkPS(np),
     ladenDice:Array(np).fill(null),
+    ladenDone:Array(np).fill(false),
+    ladenOrder:Array.from({length:np},(_,i)=>i),
     halfLosers:[null,null],markerHolder:null,finalists:[],
     lastResults:[],lastBest:-1,lastWorst:-1,lastMsg:'',gameLoser:null,
     message:'Laden — jeder würfelt einmal, höchste Zahl beginnt!',ts:Date.now()
   };
   await MP.roomRef.update({status:'playing',players,state:JSON.parse(JSON.stringify(G))});
   showScreen('game');render();MP.schedAI();
-  initChat();
+  initGameChat();
 }
 
 // ═══════════════════════════════════════════════
