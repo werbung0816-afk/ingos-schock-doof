@@ -595,7 +595,7 @@ function initLobbyChat(){
   var db; try{ db=getDB(); } catch(e){ console.warn('Lobby chat: no DB'); return; }
   if(!db){ console.warn('Lobby chat: DB null'); return; }
 
-  var lobbyRef = db.ref('rooms/sd_lobby');
+  var lobbyRef = getLobbyRef(); if(!lobbyRef){console.warn('Lobby chat: no lobbyRef');return;}
   var msgsEl = document.getElementById('lobby-chat-msgs');
   var inputEl = document.getElementById('lobby-chat-input');
   var sendEl  = document.getElementById('lobby-chat-send');
@@ -655,6 +655,13 @@ const FB_CFG={
   appId:"1:848283747928:web:5ebdf6814518ea87bdac2d"
 };
 let _db=null;
+let _lobbyRef=null; // persistent lobby chat reference
+function getLobbyRef(){
+  if(_lobbyRef)return _lobbyRef;
+  const db=getDB();
+  if(db){_lobbyRef=db.ref('rooms/sd_lobby');return _lobbyRef;}
+  return null;
+}
 function getDB(){
   if(_db)return _db;
   try{if(!firebase.apps.length)firebase.initializeApp(FB_CFG);_db=firebase.database();return _db;}
@@ -1790,13 +1797,15 @@ async function mpCreate(){
   document.getElementById('btn-mp-start').style.display='block';
   showScreen('waiting');MP.listen();mpInitWaitChat();
   // Auto-post room code to lobby chat
-  try{
-    db.ref('rooms/sd_lobby').push({
+  // Post room code to lobby chat
+  const _lr=getLobbyRef();
+  if(_lr){
+    _lr.push({
       sender:name,
       text:'Raum '+MP.roomCode+' ist offen — kommt rein! 🎲',
       ts:Date.now()
-    });
-  }catch(e){console.warn('Lobby post failed:',e);}
+    }).catch(function(e){console.warn('Lobby post failed:',e);});
+  }
 }
 
 // ── MP JOIN ──
