@@ -1789,6 +1789,14 @@ async function mpCreate(){
   document.getElementById('wt-url').textContent=location.href.split('?')[0]+'?join='+MP.roomCode;
   document.getElementById('btn-mp-start').style.display='block';
   showScreen('waiting');MP.listen();mpInitWaitChat();
+  // Auto-post room code to lobby chat
+  try{
+    db.ref('rooms/sd_lobby').push({
+      sender:name,
+      text:'Raum '+MP.roomCode+' ist offen — kommt rein! 🎲',
+      ts:Date.now()
+    });
+  }catch(e){console.warn('Lobby post failed:',e);}
 }
 
 // ── MP JOIN ──
