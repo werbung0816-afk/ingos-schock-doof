@@ -512,16 +512,7 @@ function stopChat(){
 }
 
 window.addEventListener('DOMContentLoaded',()=>{
-  // Retry until Firebase is loaded
-  function tryLobbyChat(attempts){
-    if(attempts>10)return;
-    try{
-      const db=getDB();
-      if(db){initLobbyChat();return;}
-    }catch(e){}
-    setTimeout(()=>tryLobbyChat(attempts+1),300);
-  }
-  tryLobbyChat(0);
+  setTimeout(initLobbyChat, 800);
   document.getElementById('chat-toggle').addEventListener('click',()=>{
     chatOpen=!chatOpen;
     document.getElementById('chat-panel').classList.toggle('open',chatOpen);
@@ -599,71 +590,60 @@ function mpInitWaitChat(){
   document.getElementById('wt-chat-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendWtChat();});
 }
 
-// ═══════════════════════════════════════
-// LOBBY CHAT (public, no room needed)
-// ═══════════════════════════════════════
+
 function initLobbyChat(){
-  let db;try{db=getDB();}catch(e){return;}
-  if(!db)return;
-  const lobbyRef=db.ref('sd_lobby_chat'); // sd_ prefix = schock doof
+  var db; try{ db=getDB(); } catch(e){ console.warn('Lobby chat: no DB'); return; }
+  if(!db){ console.warn('Lobby chat: DB null'); return; }
+
+  var lobbyRef = db.ref('sd_lobby');
+  var msgsEl = document.getElementById('lobby-chat-msgs');
+  var inputEl = document.getElementById('lobby-chat-input');
+  var sendEl  = document.getElementById('lobby-chat-send');
+  var emojiEl = document.getElementById('lobby-emoji-bar');
+
+  if(!msgsEl||!inputEl||!sendEl){ console.warn('Lobby chat: elements missing'); return; }
+
   // Emoji bar
-  const eb=document.getElementById('lobby-emoji-bar');
-  if(eb){
-    ['😁', '🥲', '😰', '🥳', '🫣', '🤔', '🤓', '🤪', '💩', '👌', '🥱', '🍻', '🍺', '😂', '🎲', '🙏', '👀', '🪩', '🕺', '😎', '🎁', '🧐', '🙌'].forEach(em=>{
-      const b=document.createElement('button');
+  if(emojiEl){
+    ['😁', '🥲', '😰', '🥳', '🫣', '🤔', '🤓', '🤪', '💩', '👌', '🥱', '🍻', '🍺', '😂', '🎲', '🙏', '👀', '🪩', '🕺', '😎', '🎁', '🧐', '🙌'].forEach(function(em){
+      var b=document.createElement('button');
       b.textContent=em;
-      b.style.cssText='background:none;border:none;cursor:pointer;font-size:16px;padding:2px 3px;border-radius:5px;';
-      b.onclick=()=>{const i=document.getElementById('lobby-chat-input');if(i){i.value+=em;i.focus();}};
-      eb.appendChild(b);
+      b.style.cssText='background:none;border:none;cursor:pointer;font-size:16px;padding:2px 3px;';
+      b.onclick=function(){ inputEl.value+=em; inputEl.focus(); };
+      emojiEl.appendChild(b);
     });
   }
-  // Seed welcome message if chat is empty
-  lobbyRef.limitToLast(1).once('value',snap=>{
+
+  // Seed Ingo message if chat empty
+  lobbyRef.limitToLast(1).once('value', function(snap){
     if(!snap.exists()){
-      lobbyRef.push({sender:'Ingo',text:'Na? Kannste auch nicht schlafen?',ts:Date.now()-1});
+      lobbyRef.push({sender:'Ingo', text:'Na? Kannste auch nicht schlafen?', ts: Date.now()});
     }
   });
-  // Load last 30 messages
-  lobbyRef.limitToLast(30).on('child_added',snap=>{
-    const msg=snap.val();if(!msg)return;
-    const msgs=document.getElementById('lobby-chat-msgs');
-    if(!msgs)return;
-    // Remove placeholder
-    const ph=document.getElementById('lobby-placeholder');if(ph)ph.remove();
-    const div=document.createElement('div');
-    div.style.cssText='font-size:12px;line-height:1.4;';
-    const safeText=String(msg.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
-    const safeName=String(msg.sender||'?').replace(/&/g,'&amp;').replace(/</g,'&lt;');
-    div.innerHTML=`<span style="color:rgba(232,224,208,.6);">${safeText}</span><span style="color:#d4af37;font-weight:600;margin-left:5px;">— ${safeName}</span>`;
-    msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
-  });
-  // Auto-clean messages older than 2 hours
-  const cutoff=Date.now()-7200000;
-  lobbyRef.orderByChild('ts').endAt(cutoff).once('value',snap=>{
-    snap.forEach(child=>child.ref.remove());
-  });
-  // Show placeholder until messages load
-  const msgs=document.getElementById('lobby-chat-msgs');
-  if(msgs&&msgs.children.length===0){
-    const ph=document.createElement('div');ph.id='lobby-placeholder';
-    ph.style.cssText='color:rgba(255,255,255,.2);font-size:11px;font-style:italic;padding:4px 0;';
-    ph.textContent='Lade Nachrichten…';msgs.appendChild(ph);
-  }
 
-  function sendLobby(){
-    const inp=document.getElementById('lobby-chat-input');
-    const nameEl=document.getElementById('solo-name');
-    const name=(nameEl&&nameEl.value.trim())||'Gast';
-    const text=inp?inp.value.trim():'';
-    if(!text)return;
-    lobbyRef.push({sender:name,text,ts:Date.now()});
-    if(inp)inp.value='';
+  // Listen for messages
+  lobbyRef.limitToLast(30).on('child_added', function(snap){
+    var msg = snap.val(); if(!msg) return;
+    var d = document.createElement('div');
+    d.style.cssText = 'font-size:12px;line-height:1.5;padding:1px 0;';
+    var txt = String(msg.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    var name= String(msg.sender||'?').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    d.innerHTML = '<span style="color:rgba(232,224,208,.7)">'+txt+'</span>'
+                + '<span style="color:#d4af37;font-weight:600;margin-left:6px;">— '+name+'</span>';
+    msgsEl.appendChild(d);
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  });
+
+  // Send
+  function send(){
+    var text = inputEl.value.trim(); if(!text) return;
+    var nameEl = document.getElementById('solo-name');
+    var name = (nameEl && nameEl.value.trim()) || 'Gast';
+    lobbyRef.push({sender:name, text:text, ts:Date.now()});
+    inputEl.value = '';
   }
-  // Wire up send button directly (no clone needed — first init)
-  const sb=document.getElementById('lobby-chat-send');
-  const inp2=document.getElementById('lobby-chat-input');
-  if(sb)sb.onclick=sendLobby;
-  if(inp2)inp2.addEventListener('keydown',e=>{if(e.key==='Enter')sendLobby();});
+  sendEl.addEventListener('click', send);
+  inputEl.addEventListener('keydown', function(e){ if(e.key==='Enter') send(); });
 }
 // ═══════════════════════════════════════════════
 // FIREBASE
