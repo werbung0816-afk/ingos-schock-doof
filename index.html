@@ -174,16 +174,13 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   .pgrid{padding:0 8px;}
   .mitte-wrap{padding:10px 14px 4px;gap:10px;}
   .card{padding:24px 20px;}
-  /* Chat button smaller on mobile */
-  #chat-wrap{bottom:16px;right:10px;width:min(290px,92vw);}
+  /* Chat button on mobile */
+  #chat-wrap{top:64px;right:0;width:min(280px,92vw);}
   #chat-toggle{font-size:9px;padding:6px 11px;letter-spacing:1px;}
-  /* More bottom padding on mobile for iPhone home bar */
-  #screen-game.active{padding-bottom:100px;}
 }
-/* iPhone notch / home bar safe area */
+/* iPhone notch / home bar safe area — only header offset */
 @supports(padding-bottom:env(safe-area-inset-bottom)){
-  #screen-game.active{padding-bottom:calc(100px + env(safe-area-inset-bottom));}
-  #chat-wrap{bottom:calc(16px + env(safe-area-inset-bottom));}
+  #screen-game.active{padding-bottom:calc(20px + env(safe-area-inset-bottom));}
 }
 
 /* ── CHAT ── */
@@ -509,6 +506,7 @@ function stopChat(){
 }
 
 window.addEventListener('DOMContentLoaded',()=>{
+  initLobbyChat();
   document.getElementById('chat-toggle').addEventListener('click',()=>{
     chatOpen=!chatOpen;
     document.getElementById('chat-panel').classList.toggle('open',chatOpen);
@@ -584,6 +582,55 @@ function mpInitWaitChat(){
   inp.replaceWith(inp.cloneNode(true));
   document.getElementById('wt-chat-send').addEventListener('click',sendWtChat);
   document.getElementById('wt-chat-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendWtChat();});
+}
+
+// ═══════════════════════════════════════
+// LOBBY CHAT (public, no room needed)
+// ═══════════════════════════════════════
+function initLobbyChat(){
+  const db=getDB();if(!db)return;
+  const lobbyRef=db.ref('lobby_chat');
+  const msgs=document.getElementById('lobby-chat-msgs');
+  // Emoji bar
+  const eb=document.getElementById('lobby-emoji-bar');
+  if(eb){
+    ['😁', '🥲', '😰', '🥳', '🫣', '🤔', '🤓', '🤪', '💩', '👌', '🥱', '🍻', '🍺', '😂', '🎲', '🙏', '👀', '🪩', '🕺', '😎', '🎁', '🧐', '🙌'].forEach(em=>{
+      const b=document.createElement('button');
+      b.textContent=em;
+      b.style.cssText='background:none;border:none;cursor:pointer;font-size:16px;padding:2px 3px;border-radius:5px;';
+      b.onclick=()=>{const i=document.getElementById('lobby-chat-input');if(i){i.value+=em;i.focus();}};
+      eb.appendChild(b);
+    });
+  }
+  // Load last 30 messages
+  lobbyRef.limitToLast(30).on('child_added',snap=>{
+    const msg=snap.val();if(!msg)return;
+    if(!msgs)return;
+    const div=document.createElement('div');
+    div.style.cssText='font-size:12px;line-height:1.4;';
+    const safeText=String(msg.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    const safeName=String(msg.sender||'?').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    div.innerHTML=`<span style="color:rgba(232,224,208,.6);">${safeText}</span><span style="color:#d4af37;font-weight:600;margin-left:5px;">— ${safeName}</span>`;
+    msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
+  });
+  // Auto-clean messages older than 2 hours
+  const cutoff=Date.now()-7200000;
+  lobbyRef.orderByChild('ts').endAt(cutoff).once('value',snap=>{
+    snap.forEach(child=>child.ref.remove());
+  });
+  function sendLobby(){
+    const nameEl=document.getElementById('lobby-chat-name');
+    const inp=document.getElementById('lobby-chat-input');
+    const name=(nameEl?nameEl.value.trim():'')||'Gast';
+    const text=inp?inp.value.trim():'';
+    if(!text)return;
+    lobbyRef.push({sender:name,text,ts:Date.now()});
+    if(inp)inp.value='';
+  }
+  const sb=document.getElementById('lobby-chat-send');
+  const inp=document.getElementById('lobby-chat-input');
+  if(sb)sb.onclick=sendLobby;
+  if(inp)inp.addEventListener('keydown',e=>{if(e.key==='Enter')sendLobby();});
 }
 // ═══════════════════════════════════════════════
 // FIREBASE
