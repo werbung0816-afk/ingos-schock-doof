@@ -184,34 +184,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 }
 
 /* ── CHAT ── */
-#chat-wrap{
-  position:fixed;bottom:20px;right:16px;z-index:300;
-  display:none;flex-direction:column;
-  width:min(320px,90vw);
-}
-#chat-wrap.active{display:flex;}
-#chat-toggle{
-  align-self:flex-end;
-  background:linear-gradient(135deg,var(--gold3),var(--gold));
-  color:#1a0f00;border:none;border-radius:20px;padding:8px 16px;
-  font-family:'Cinzel',serif;font-size:11px;letter-spacing:2px;
-  cursor:pointer;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.4);
-  display:flex;align-items:center;gap:6px;
-}
-#chat-badge{
-  background:#e74c3c;color:#fff;border-radius:50%;
-  width:16px;height:16px;font-size:10px;display:none;
-  align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;font-weight:700;
-}
-#chat-badge.has-new{display:flex;}
-#chat-panel{
-  background:linear-gradient(160deg,#0b1a0d,#070e08);
-  border:1px solid rgba(212,175,55,.2);border-radius:14px;
-  margin-bottom:8px;overflow:hidden;
-  box-shadow:0 20px 60px rgba(0,0,0,.7);
-  display:none;flex-direction:column;max-height:340px;
-}
-#chat-panel.open{display:flex;}
+
 #chat-title{
   font-family:'Cinzel',serif;font-size:11px;letter-spacing:3px;
   color:rgba(212,175,55,.6);padding:10px 14px 8px;
@@ -431,19 +404,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 </div>
 </div>
 
-<!-- CHAT (nur MP) -->
-<div id="chat-wrap">
-  <div id="chat-panel">
-    <div id="chat-title">💬 CHAT</div>
-    <div id="chat-msgs"></div>
-    <div id="emoji-bar"></div>
-    <div id="chat-input-row">
-      <input id="chat-input" placeholder="Nachricht…" maxlength="120" autocomplete="off">
-      <button id="chat-send">→</button>
-    </div>
-  </div>
-  <button id="chat-toggle">💬 Chat <span id="chat-badge"></span></button>
-</div>
 
 <script>
 'use strict';
@@ -515,42 +475,19 @@ function sendChat(){
 }
 
 function stopChat(){
-  if(chatRef&&chatListener)chatRef.off('child_added',chatListener);
-  chatListener=null;chatRef=null;chatUnread=0;
-  document.getElementById('chat-wrap').classList.remove('active');
-  document.getElementById('chat-panel').classList.remove('open');
-  document.getElementById('chat-msgs').innerHTML='';
-  document.getElementById('chat-badge').classList.remove('has-new');
+  if(_chatRef&&_chatListener){_chatRef.off('child_added',_chatListener);_chatListener=null;}
+  _chatRef=null;_chatOpen=false;_chatUnread=0;
+  const ic=document.getElementById('inline-chat');if(ic)ic.style.display='none';
+  const panel=document.getElementById('inline-chat-panel');if(panel)panel.classList.remove('open');
+  const msgs=document.getElementById('inline-chat-msgs');if(msgs)msgs.innerHTML='';
+  const lb=document.getElementById('inline-chat-latest');if(lb)lb.textContent='Tippe um zu chatten…';
+  const wc=document.getElementById('wt-chat');if(wc)wc.classList.remove('show');
+  const wm=document.getElementById('wt-chat-msgs');if(wm)wm.innerHTML='';
 }
 
 window.addEventListener('DOMContentLoaded',()=>{
   setTimeout(initLobbyChat, 800);
-  document.getElementById('chat-toggle').addEventListener('click',()=>{
-    chatOpen=!chatOpen;
-    document.getElementById('chat-panel').classList.toggle('open',chatOpen);
-    if(chatOpen){
-      chatUnread=0;
-      const badge=document.getElementById('chat-badge');
-      badge.textContent='';badge.classList.remove('has-new');
-      const msgs=document.getElementById('chat-msgs');
-      msgs.scrollTop=msgs.scrollHeight;
-    }
-  });
-  document.getElementById('chat-send').addEventListener('click',sendChat);
-  document.getElementById('chat-input').addEventListener('keydown',e=>{
-    if(e.key==='Enter')sendChat();
-  });
-  // Emoji picker
-  const emojiBar=document.getElementById('emoji-bar');
-  ['😁', '🥲', '😰', '🥳', '🫣', '🤔', '🤓', '🤪', '💩', '👌', '🥱', '🍻', '🍺', '😂', '🎲', '🙏', '👀', '🪩', '🕺', '😎', '🎁', '🧐', '🙌'].forEach(em=>{
-    const b=document.createElement('button');
-    b.className='emoji-btn';b.textContent=em;b.title=em;
-    b.addEventListener('click',()=>{
-      const inp=document.getElementById('chat-input');
-      inp.value+=em;inp.focus();
-    });
-    emojiBar.appendChild(b);
-  });
+  // (emoji bars initialized in initLobbyChat / initGameChat)
 });
 
 
