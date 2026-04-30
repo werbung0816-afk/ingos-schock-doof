@@ -289,6 +289,16 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
     <input class="lb-input name" id="join-name" placeholder="Name" maxlength="16" autocomplete="off">
     <button class="btn-gold" id="btn-join">→</button>
   </div>
+  <div class="divider"></div>
+  <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:4px;color:rgba(212,175,55,.4);margin-bottom:8px">💬 LOBBY CHAT</div>
+  <div style="font-size:11px;color:rgba(255,255,255,.25);margin-bottom:8px;">Koordiniert euch & teilt Raumcodes</div>
+  <div id="lobby-chat-msgs" style="height:130px;overflow-y:auto;background:rgba(0,0,0,.15);border:1px solid rgba(212,175,55,.1);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:5px;margin-bottom:8px;scrollbar-width:thin;scrollbar-color:rgba(212,175,55,.2) transparent;"></div>
+  <div id="lobby-emoji-bar" style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;"></div>
+  <div style="display:flex;gap:8px;">
+    <input id="lobby-chat-name" class="lb-input" placeholder="Name" maxlength="16" style="flex:0 0 90px;" autocomplete="off">
+    <input id="lobby-chat-input" class="lb-input" placeholder="Nachricht…" maxlength="120" style="flex:1;" autocomplete="off">
+    <button id="lobby-chat-send" style="background:linear-gradient(135deg,#9a7015,#d4af37);color:#1a0f00;border:none;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer;font-size:14px;flex-shrink:0;">→</button>
+  </div>
 </div>
 </div>
 
