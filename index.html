@@ -512,7 +512,16 @@ function stopChat(){
 }
 
 window.addEventListener('DOMContentLoaded',()=>{
-  initLobbyChat();
+  // Retry until Firebase is loaded
+  function tryLobbyChat(attempts){
+    if(attempts>10)return;
+    try{
+      const db=getDB();
+      if(db){initLobbyChat();return;}
+    }catch(e){}
+    setTimeout(()=>tryLobbyChat(attempts+1),300);
+  }
+  tryLobbyChat(0);
   document.getElementById('chat-toggle').addEventListener('click',()=>{
     chatOpen=!chatOpen;
     document.getElementById('chat-panel').classList.toggle('open',chatOpen);
@@ -594,7 +603,8 @@ function mpInitWaitChat(){
 // LOBBY CHAT (public, no room needed)
 // ═══════════════════════════════════════
 function initLobbyChat(){
-  const db=getDB();if(!db)return;
+  let db;try{db=getDB();}catch(e){return;}
+  if(!db)return;
   const lobbyRef=db.ref('lobby_chat');
   const msgs=document.getElementById('lobby-chat-msgs');
   // Emoji bar
@@ -640,13 +650,11 @@ function initLobbyChat(){
     lobbyRef.push({sender:name,text,ts:Date.now()});
     if(inp)inp.value='';
   }
-  // Wire up send button and enter key
-  setTimeout(()=>{
-    const sb=document.getElementById('lobby-chat-send');
-    const inp2=document.getElementById('lobby-chat-input');
-    if(sb){sb.replaceWith(sb.cloneNode(true));document.getElementById('lobby-chat-send').onclick=sendLobby;}
-    if(inp2){inp2.replaceWith(inp2.cloneNode(true));document.getElementById('lobby-chat-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendLobby();});}
-  },200);
+  // Wire up send button directly (no clone needed — first init)
+  const sb=document.getElementById('lobby-chat-send');
+  const inp2=document.getElementById('lobby-chat-input');
+  if(sb)sb.onclick=sendLobby;
+  if(inp2)inp2.addEventListener('keydown',e=>{if(e.key==='Enter')sendLobby();});
 }
 // ═══════════════════════════════════════════════
 // FIREBASE
