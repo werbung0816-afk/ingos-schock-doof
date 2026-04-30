@@ -270,7 +270,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   </div>
   <div class="lb-lbl">DEIN NAME</div>
   <input class="lb-input" id="solo-name" placeholder="Ingo" maxlength="16" autocomplete="off">
-  <div class="lb-lbl">SPIELERANZAHL</div>
+  <div class="lb-lbl" style="margin-top:14px;">SPIELERANZAHL</div>
   <div class="seg">
     <button class="seg-btn" data-count="2">2</button>
     <button class="seg-btn on" data-count="3">3</button>
@@ -279,14 +279,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   <button class="btn-gold" id="btn-solo">SOLO STARTEN →</button>
   <div class="divider"></div>
   <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:4px;color:rgba(212,175,55,.4);margin-bottom:10px">MULTIPLAYER</div>
-  <div class="lb-lbl">DEIN NAME</div>
-  <input class="lb-input" id="host-name" placeholder="Ingo" maxlength="16" autocomplete="off">
   <button class="btn-gold" id="btn-create">RAUM ERSTELLEN →</button>
   <div class="divider"></div>
   <div class="lb-lbl">RAUM BEITRETEN</div>
   <div class="join-row">
     <input class="lb-input code" id="join-code" placeholder="1234" maxlength="4" inputmode="numeric" style="flex:0 0 120px;min-width:120px;font-size:18px;font-weight:700;letter-spacing:6px;text-align:center;padding:12px 8px;">
-    <input class="lb-input name" id="join-name" placeholder="Name" maxlength="16" autocomplete="off">
     <button class="btn-gold" id="btn-join">→</button>
   </div>
   <div class="divider"></div>
@@ -295,7 +292,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   <div id="lobby-chat-msgs" style="height:130px;overflow-y:auto;background:rgba(0,0,0,.15);border:1px solid rgba(212,175,55,.1);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:5px;margin-bottom:8px;scrollbar-width:thin;scrollbar-color:rgba(212,175,55,.2) transparent;"></div>
   <div id="lobby-emoji-bar" style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;"></div>
   <div style="display:flex;gap:8px;">
-    <input id="lobby-chat-name" class="lb-input" placeholder="Name" maxlength="16" style="flex:0 0 90px;" autocomplete="off">
     <input id="lobby-chat-input" class="lb-input" placeholder="Nachricht…" maxlength="120" style="flex:1;" autocomplete="off">
     <button id="lobby-chat-send" style="background:linear-gradient(135deg,#9a7015,#d4af37);color:#1a0f00;border:none;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer;font-size:14px;flex-shrink:0;">→</button>
   </div>
@@ -612,6 +608,12 @@ function initLobbyChat(){
       eb.appendChild(b);
     });
   }
+  // Seed welcome message if chat is empty
+  lobbyRef.limitToLast(1).once('value',snap=>{
+    if(!snap.exists()){
+      lobbyRef.push({sender:'Ingo',text:'Na? Kannste auch nicht schlafen?',ts:Date.now()-1});
+    }
+  });
   // Load last 30 messages
   lobbyRef.limitToLast(30).on('child_added',snap=>{
     const msg=snap.val();if(!msg)return;
@@ -629,18 +631,22 @@ function initLobbyChat(){
     snap.forEach(child=>child.ref.remove());
   });
   function sendLobby(){
-    const nameEl=document.getElementById('lobby-chat-name');
     const inp=document.getElementById('lobby-chat-input');
-    const name=(nameEl?nameEl.value.trim():'')||'Gast';
+    // Use the solo-name field as sender name
+    const nameEl=document.getElementById('solo-name');
+    const name=(nameEl&&nameEl.value.trim())||'Gast';
     const text=inp?inp.value.trim():'';
     if(!text)return;
     lobbyRef.push({sender:name,text,ts:Date.now()});
     if(inp)inp.value='';
   }
-  const sb=document.getElementById('lobby-chat-send');
-  const inp=document.getElementById('lobby-chat-input');
-  if(sb)sb.onclick=sendLobby;
-  if(inp)inp.addEventListener('keydown',e=>{if(e.key==='Enter')sendLobby();});
+  // Wire up send button and enter key
+  setTimeout(()=>{
+    const sb=document.getElementById('lobby-chat-send');
+    const inp2=document.getElementById('lobby-chat-input');
+    if(sb){sb.replaceWith(sb.cloneNode(true));document.getElementById('lobby-chat-send').onclick=sendLobby;}
+    if(inp2){inp2.replaceWith(inp2.cloneNode(true));document.getElementById('lobby-chat-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendLobby();});}
+  },200);
 }
 // ═══════════════════════════════════════════════
 // FIREBASE
@@ -1775,7 +1781,7 @@ function soloStart(){
 // ── MP CREATE ──
 async function mpCreate(){
   const db=getDB();if(!db)return;
-  const name=(document.getElementById('host-name').value.trim()||'Ingo').slice(0,16);
+  const name=(document.getElementById('solo-name').value.trim()||'Ingo').slice(0,16);
   MP.myName=name;MP.host=true;MP.myIdx=0;MP.NP=selectedCount;ME=0;NP=selectedCount;
   MP.roomCode=String(Math.floor(1000+Math.random()*9000));
   MP.roomRef=db.ref('rooms/sd_'+MP.roomCode);
@@ -1792,7 +1798,7 @@ async function mpCreate(){
 async function mpJoin(){
   const db=getDB();if(!db)return;
   const code=document.getElementById('join-code').value.trim();
-  const name=(document.getElementById('join-name').value.trim()||'Gast').slice(0,16);
+  const name=(document.getElementById('solo-name').value.trim()||'Gast').slice(0,16);
   if(code.length!==4){alert('4-stelligen Code eingeben!');return;}
   MP.roomRef=db.ref('rooms/sd_'+code);MP.roomCode=code;
   const snap=await MP.roomRef.once('value');
