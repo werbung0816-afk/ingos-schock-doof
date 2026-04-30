@@ -675,6 +675,7 @@ const MP={
           G=raw;NP=G.players.length;
           showScreen('game');
           render();
+          if(MP.on&&typeof initGameChat==='function')initGameChat();
           if(MP.on&&!document.getElementById('chat-wrap').classList.contains('active'))initChat();
           if(G.phase!==oldPhase||G.phase==='summary')handlePhaseChange(G.phase);
           if(MP.host)MP.schedAI();
@@ -710,9 +711,8 @@ function fixGS(gs){
 
 function handlePhaseChange(phase){
   if(phase==='summary'){
-    // Guest always shows; host only if modal not already open
-    if(!MP.host||!document.getElementById('modal-summary').classList.contains('open'))
-      showSummary();
+    const sumOpen=document.getElementById('modal-summary').classList.contains('open');
+    if(!sumOpen) showSummary(); // both host and guest if not already open
   }
   else if(phase==='halfend'){
     if(!MP.host||!document.getElementById('modal-halfend').classList.contains('open'))
