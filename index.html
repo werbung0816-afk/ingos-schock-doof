@@ -132,7 +132,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .combo-lbl.strasse{color:#5dade2;}
 .throws-left{margin-top:8px;font-family:'Cinzel',serif;font-size:10px;letter-spacing:3px;color:rgba(212,175,55,.4);}
 .action-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
-.btn-roll{-webkit-tap-highlight-color:transparent;touch-action:manipulation;padding:12px 22px;border-radius:10px;border:none;cursor:pointer;background:linear-gradient(135deg,var(--gold3),var(--gold),var(--gold2));color:#1a0f00;font-weight:700;font-size:14px;font-family:'Cinzel',serif;letter-spacing:3px;transition:filter .2s,transform .1s;flex:1;}
+.btn-roll{-webkit-tap-highlight-color:transparent;touch-action:manipulation;padding:12px 22px;border-radius:10px;border:none;cursor:pointer;background:linear-gradient(135deg,var(--gold3),var(--gold),var(--gold2));color:#1a0f00;font-weight:700;font-size:14px;font-family:'Cinzel',serif;letter-spacing:3px;transition:filter .2s,transform .1s;flex:1;max-width:220px;}
 .btn-roll:disabled{opacity:.35;cursor:default;}
 .btn-roll:not(:disabled):hover{filter:brightness(1.1);}
 .btn-roll:not(:disabled):active{transform:scale(.98);}
@@ -1443,6 +1443,18 @@ function renderCup(){
   // In Finale, human only participates if they're a finalist
   const inFinaleNotFinalist=G.half==='finale'&&G.finalists&&G.finalists.length>0&&!G.finalists.includes(ME);
   const isMyTurn=(G.phase==='rolling'||G.phase==='laden')&&G.currentTurn===ME&&!inFinaleNotFinalist;
+  if(inFinaleNotFinalist&&G.phase==='rolling'){
+    // Show spectator view
+    const diceRow=document.getElementById('my-dice');
+    const hint=document.getElementById('dice-hint');
+    const throwsEl=document.getElementById('throws-left');
+    const actions=document.getElementById('action-row');
+    if(diceRow)diceRow.innerHTML='';
+    if(hint)hint.innerHTML='<span style="color:rgba(212,175,55,.5);font-style:italic">👀 Du schaust dem Finale zu…</span>';
+    if(throwsEl)throwsEl.textContent='';
+    if(actions)actions.innerHTML='';
+    return;
+  }
   const ps=G.playerStates?G.playerStates[ME]:null;
   const diceRow=document.getElementById('my-dice');
   const hint=document.getElementById('dice-hint');
