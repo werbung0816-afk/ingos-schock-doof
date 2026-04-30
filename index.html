@@ -82,6 +82,18 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 @media(max-width:500px){.pgrid.np3{grid-template-columns:1fr 1fr;}}
 
 .pcard{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05);border-radius:14px;padding:12px 14px;transition:all .25s;position:relative;min-height:90px;}
+@media(max-width:600px){
+  .pcard{padding:8px 10px;min-height:70px;border-radius:10px;}
+  .pcard-lids{font-size:18px;}
+  .pcard-name{font-size:11px;}
+  .die{width:30px;height:30px;border-radius:5px;}
+  .die.sm{width:26px;height:26px;}
+  .pgrid{gap:6px;padding:0 8px;}
+  .cup-area{padding:10px 12px;}
+  .mitte-num{font-size:34px;}
+  .btn-roll{padding:10px 16px;font-size:13px;}
+  .btn-sec{padding:8px 10px;font-size:11px;}
+}
 .pcard.active-turn{border-color:rgba(212,175,55,.4);background:rgba(212,175,55,.06);box-shadow:0 0 20px rgba(212,175,55,.07);}
 .pcard.is-me{border-color:rgba(46,204,113,.15);}
 .pcard.is-me.active-turn{border-color:rgba(46,204,113,.5);}
@@ -963,7 +975,7 @@ function doLaden(playerIdx){
   document.getElementById('cup-icon').classList.add('shaking');
   setTimeout(()=>document.getElementById('cup-icon').classList.remove('shaking'),400);
 
-  const allDone=G.ladenDice.every(d=>d!==null);
+  const allDone=G.ladenDice.every(d=>d!=null); // != catches undefined (Firebase drops nulls)
   if(allDone){
     // Show result for 1.5s, then start rolling
     let best=-1,bestVal=0;
@@ -1335,6 +1347,8 @@ function aiMarkKeep(pi){
 // ═══════════════════════════════════════════════
 function render(){
   if(!G)return;
+  // Show inline chat for MP
+  if(MP.on){const ic=document.getElementById('inline-chat');if(ic&&ic.style.display==='none')ic.style.display='block';}
   // Safety net: detect any missed game-over (any phase where someone has all 13 lids)
   if(G.phase==='rolling'||G.phase==='summary'){
     const loser13=G.players.findIndex(p=>p.lids>=TOTAL_LIDS);
@@ -1559,7 +1573,7 @@ function renderCup(){
 // Cup click
 document.getElementById('cup-icon').addEventListener('click',()=>{
   if(!G)return;
-  if(G.phase==='laden'&&G.currentTurn===ME&&G.ladenDice[ME]===null){doLaden(ME);return;}
+  if(G.phase==='laden'&&G.currentTurn===ME&&G.ladenDice[ME]==null){doLaden(ME);return;}
   if(G.phase==='rolling'&&G.currentTurn===ME){
     const ps=G.playerStates[ME];
     if(!ps.done&&(ps.throwNum===0||(G.throwsAllowed-ps.throwNum)>0))doRoll(ME);
