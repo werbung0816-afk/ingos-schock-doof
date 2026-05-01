@@ -602,7 +602,7 @@ function mpInitWaitChat(){
   });
 
   // Listen for chat messages
-  MP.roomRef.child('chat').on('child_added',snap=>{
+  getDB().ref('rooms/sd_lobby').limitToLast(20).on('child_added',snap=>{
     const msg=snap.val();if(!msg)return;
     const div=document.createElement('div');
     div.style.cssText='font-size:13px;line-height:1.4;';
@@ -617,7 +617,7 @@ function mpInitWaitChat(){
   function sendWtChat(){
     const inp=document.getElementById('wt-chat-input');
     const text=inp.value.trim();if(!text||!MP.roomRef)return;
-    MP.roomRef.child('chat').push({sender:MP.myName||'?',text,ts:Date.now()});
+    getDB().ref('rooms/sd_lobby').push({sender:MP.myName||'?',text,ts:Date.now()});
     inp.value='';
   }
   const sendBtn=document.getElementById('wt-chat-send');
