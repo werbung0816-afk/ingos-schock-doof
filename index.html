@@ -183,7 +183,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   #status-msg{font-size:11px;padding:2px 0 3px;}
   /* Player grid — other players very compact */
   .pgrid{padding:0 6px;gap:4px;}
-  .pcard{padding:4px 8px;min-height:0;border-radius:8px;}
+  .pcard{padding:3px 7px !important;min-height:0 !important;border-radius:7px;}
   .pcard-name{font-size:10px;letter-spacing:0px;margin-bottom:1px;}
   .pcard-tag{font-size:7px;padding:1px 4px;border-radius:3px;}
   .pcard-lids{font-size:13px;margin-top:2px;}
@@ -196,7 +196,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   /* Cup area — compact but still usable */
   .cup-area{margin:0 6px;padding:7px 10px 8px;}
   .cup-lbl{font-size:8px;letter-spacing:2px;}
-  #cup-static,#cup-gif{width:56px;height:auto;}
+  #cup-static,#cup-gif{width:52px !important;height:58px !important;overflow:hidden;}
+  #cup-static svg{width:52px !important;height:58px !important;}
   /* My dice — comfortable */
   #my-dice{gap:5px;}
   .die.lg{width:40px;height:40px;}
@@ -1929,6 +1930,8 @@ async function mpHostStart(){
     message:'Laden — jeder würfelt einmal, höchste Zahl beginnt!',ts:Date.now()
   };
   await MP.roomRef.update({status:'playing',players,state:JSON.parse(JSON.stringify(G))});
+  // Clear lobby chat when game starts
+  try{var ldb2=getDB();if(ldb2)ldb2.ref('rooms/sd_lobby').remove();}catch(e){}
   showScreen('game');render();MP.schedAI();
   initChat();
 }
