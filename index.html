@@ -168,7 +168,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 #confetti{position:fixed;inset:0;pointer-events:none;z-index:999;display:none;}
 
 @media(max-width:600px){
-  header{padding:6px 10px;}
+  header{padding:4px 10px;}
+  .card{padding:12px 14px;}
   .logo-main{font-size:16px;letter-spacing:2px;}
   #round-chip{font-size:8px;padding:3px 7px;}
   .mitte-wrap{padding:4px 8px 3px;gap:6px;}
@@ -273,7 +274,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <!-- LOBBY -->
 <div id="screen-lobby" class="screen">
 <div class="card">
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
     <div style="position:relative;flex-shrink:0">
       <img id="ingo-logo" style="width:48px;height:48px;border-radius:50%;object-fit:cover;object-position:center 25%;border:2px solid var(--gold);box-shadow:0 0 14px rgba(212,175,55,.3);" src="" alt="Ingo">
       <div style="position:absolute;bottom:-2px;right:-2px;background:linear-gradient(135deg,var(--gold3),var(--gold));border-radius:50%;width:14px;height:14px;display:flex;align-items:center;justify-content:center;font-size:7px">★</div>
@@ -656,8 +657,17 @@ function initLobbyChat(){
     var d=document.createElement('div');d.style.cssText='line-height:1.4;';
     var t=String(msg.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
     var n=String(msg.sender||'?').replace(/&/g,'&amp;').replace(/</g,'&lt;');
-    d.innerHTML='<span>'+t+'</span><span style="color:#d4af37;font-weight:600;margin-left:5px;">— '+n+'</span>';
-    msgsEl.appendChild(d);msgsEl.scrollTop=msgsEl.scrollHeight;
+    // Detect 4-digit code and make it clickable via data attribute
+    var reCode=/\b(\d{4})\b/;
+    var cm=t.match(reCode);
+    if(cm){
+      var c4=cm[1];
+      var linked=t.replace(c4,'<b class="lobby-code" data-code="'+c4+'" style="color:#f0d060;cursor:pointer;border-bottom:1px solid #d4af37">'+c4+'</b>');
+      d.innerHTML='<span>'+linked+'</span><span style="color:#d4af37;font-weight:600;margin-left:5px;">— '+n+'</span>';
+    } else {
+      d.innerHTML='<span>'+t+'</span><span style="color:#d4af37;font-weight:600;margin-left:5px;">— '+n+'</span>';
+    }
+        msgsEl.appendChild(d);msgsEl.scrollTop=msgsEl.scrollHeight;
   });
   function send(){
     var t=inpEl.value.trim();if(!t)return;
@@ -666,6 +676,14 @@ function initLobbyChat(){
   }
   sendEl.onclick=send;
   inpEl.addEventListener('keydown',function(e){if(e.key==='Enter')send();});
+  // Click on room code to fill join field
+  msgsEl.addEventListener('click',function(e){
+    var el=e.target.closest('.lobby-code');
+    if(el){
+      var jc=document.getElementById('join-code');
+      if(jc){jc.value=el.dataset.code;jc.focus();}
+    }
+  });
 }
 // ═══════════════════════════════════════════════
 // FIREBASE
