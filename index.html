@@ -167,21 +167,48 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 /* ── CONFETTI ── */
 #confetti{position:fixed;inset:0;pointer-events:none;z-index:999;display:none;}
 
-@media(max-width:480px){
-  .logo-main{font-size:20px;letter-spacing:4px;}
-  header{padding:10px 14px 8px;}
-  .cup-area{margin:0 8px;padding:10px 12px;}
-  .pgrid{padding:0 6px;gap:6px;}
-  .mitte-wrap{padding:8px 12px 4px;gap:8px;}
-  .card{padding:20px 16px;}
-  .pcard{padding:8px 10px;min-height:70px;}
-  .die{width:28px;height:28px;border-radius:5px;}
-  .die.sm{width:24px;height:24px;}
-  .btn-roll{max-width:200px;padding:10px 16px;font-size:12px;}
-  /* old chat-wrap override removed */
-}
-@supports(padding:env(safe-area-inset-bottom)){
-  #screen-game.active{padding-bottom:calc(20px + env(safe-area-inset-bottom));}
+@media(max-width:600px){
+  /* Header */
+  header{padding:7px 10px 6px;}
+  .logo-img{width:36px;height:36px;}
+  .logo-main{font-size:16px;letter-spacing:3px;}
+  #round-chip{font-size:9px;padding:3px 8px;}
+  /* Mitte */
+  .mitte-wrap{padding:5px 10px 3px;gap:6px;}
+  .mitte-num{font-size:26px;}
+  .mitte-lbl{font-size:7px;letter-spacing:2px;}
+  .lid-dot{width:9px;height:9px;}
+  .half-badge{font-size:8px;padding:3px 8px;border-radius:6px;}
+  /* Status */
+  #status-msg{font-size:11px;padding:2px 0 3px;}
+  /* Player grid — other players very compact */
+  .pgrid{padding:0 6px;gap:4px;}
+  .pcard{padding:4px 8px;min-height:0;border-radius:8px;}
+  .pcard-name{font-size:10px;letter-spacing:0px;margin-bottom:1px;}
+  .pcard-tag{font-size:7px;padding:1px 4px;border-radius:3px;}
+  .pcard-lids{font-size:13px;margin-top:2px;}
+  .pcard-throw{font-size:8px;letter-spacing:0px;}
+  .pcard-dice{gap:2px;margin-top:2px;}
+  /* Dice in other players grid: tiny */
+  .pgrid .die{width:20px;height:20px;border-radius:3px;}
+  .pgrid .die .pip{width:4px;height:4px;}
+  .pgrid .die.sm{width:18px;height:18px;}
+  /* Cup area — compact but still usable */
+  .cup-area{margin:0 6px;padding:7px 10px 8px;}
+  .cup-lbl{font-size:8px;letter-spacing:2px;}
+  #cup-static,#cup-gif{width:56px;height:auto;}
+  /* My dice — comfortable */
+  #my-dice{gap:5px;}
+  .die.lg{width:40px;height:40px;}
+  .die.lg .pip{width:8px;height:8px;}
+  #dice-hint{font-size:11px;}
+  #throws-left{font-size:8px;letter-spacing:1px;}
+  /* Buttons */
+  .action-row{gap:5px;margin-top:6px;}
+  .btn-roll{max-width:160px;padding:9px 12px;font-size:12px;letter-spacing:2px;}
+  .btn-sec{padding:7px 8px;font-size:10px;letter-spacing:1px;}
+  /* Safe area */
+  #screen-game.active{padding-bottom:calc(56px + env(safe-area-inset-bottom));}
 }
 
 /* ── CHAT ── */
@@ -526,14 +553,15 @@ function initChat(){
 
 function appendChatMsg(msg){
   // Update latest bar
+  // Update latest bar — always visible in game
   const lb=document.getElementById('chat-latest-bar');
   if(lb){
-    const sp=lb.querySelector('span');
-    if(sp)sp.innerHTML=escHtml(msg.text)+'<span style="color:#d4af37;font-weight:600;margin-left:6px">— '+escHtml(msg.sender)+'</span>';
-    // Flash to draw attention
+    lb.innerHTML='💬 <span style="color:rgba(232,224,208,.85);font-size:13px;">'+escHtml(msg.text)+'<span style="color:#d4af37;font-weight:700;margin-left:6px;">— '+escHtml(msg.sender)+'</span></span>';
+    // Flash gold to draw attention when panel closed
     if(!chatOpen){
-      lb.style.background='rgba(212,175,55,.12)';
-      setTimeout(()=>{lb.style.background='';},1500);
+      lb.style.background='rgba(212,175,55,.15)';
+      lb.style.transition='background .3s';
+      setTimeout(()=>{lb.style.background='';},2000);
     }
   }
   // Append to full list
