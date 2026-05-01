@@ -308,48 +308,53 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <!-- LOBBY -->
 <div id="screen-lobby" class="screen">
 <div class="card">
-  <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px">
+  <!-- Logo -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
     <div style="position:relative;flex-shrink:0">
-      <img id="ingo-logo" style="width:56px;height:56px;border-radius:50%;object-fit:cover;object-position:center 25%;border:2px solid var(--gold);box-shadow:0 0 14px rgba(212,175,55,.3);" src="" alt="Ingo">
-      <div style="position:absolute;bottom:-2px;right:-2px;background:linear-gradient(135deg,var(--gold3),var(--gold));border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:8px">★</div>
+      <img id="ingo-logo" style="width:48px;height:48px;border-radius:50%;object-fit:cover;object-position:center 25%;border:2px solid var(--gold);box-shadow:0 0 14px rgba(212,175,55,.3);" src="" alt="Ingo">
+      <div style="position:absolute;bottom:-2px;right:-2px;background:linear-gradient(135deg,var(--gold3),var(--gold));border-radius:50%;width:14px;height:14px;display:flex;align-items:center;justify-content:center;font-size:7px">★</div>
     </div>
     <div>
-      <div style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:5px;color:rgba(212,175,55,.55)">I N G O ' S</div>
-      <div style="font-family:'Cinzel',serif;font-size:22px;font-weight:900;letter-spacing:4px;color:var(--gold)">SCHOCK DOOF</div>
+      <div style="font-family:'Cinzel',serif;font-size:8px;letter-spacing:5px;color:rgba(212,175,55,.55)">I N G O ' S</div>
+      <div style="font-family:'Cinzel',serif;font-size:20px;font-weight:900;letter-spacing:4px;color:var(--gold)">SCHOCK DOOF</div>
     </div>
   </div>
+
+  <!-- 1. Name -->
   <div class="lb-lbl">DEIN NAME</div>
   <input class="lb-input" id="solo-name" placeholder="Ingo" maxlength="16" autocomplete="off">
+
+  <!-- 2. Spieleranzahl -->
   <div class="lb-lbl">SPIELERANZAHL</div>
   <div class="seg">
     <button class="seg-btn" data-count="2">2</button>
     <button class="seg-btn on" data-count="3">3</button>
     <button class="seg-btn" data-count="4">4</button>
   </div>
-  <button class="btn-gold" id="btn-solo">SOLO STARTEN →</button>
-  <div class="divider"></div>
-  <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:4px;color:rgba(212,175,55,.4);margin-bottom:10px">MULTIPLAYER</div>
-  <div class="lb-lbl">DEIN NAME</div>
-  <input class="lb-input" id="host-name" placeholder="Ingo" maxlength="16" autocomplete="off">
-  <button class="btn-gold" id="btn-create">RAUM ERSTELLEN →</button>
-  <div class="divider"></div>
-  <div class="lb-lbl">RAUM BEITRETEN</div>
-  <div class="join-row">
-    <input class="lb-input code" id="join-code" placeholder="1234" maxlength="4" inputmode="numeric" style="flex:0 0 120px;min-width:120px;font-size:18px;font-weight:700;letter-spacing:6px;text-align:center;padding:12px 8px;">
-    <input class="lb-input name" id="join-name" placeholder="Name" maxlength="16" autocomplete="off">
-    <button class="btn-gold" id="btn-join">→</button>
+
+  <!-- 3. Solo + Multiplayer nebeneinander -->
+  <div style="display:flex;gap:8px;margin-top:10px;">
+    <button class="btn-gold" id="btn-solo" style="flex:1;padding:11px 8px;font-size:11px;letter-spacing:2px;">SOLO →</button>
+    <button class="btn-gold" id="btn-create" style="flex:1;padding:11px 8px;font-size:11px;letter-spacing:2px;">RAUM ERSTELLEN →</button>
   </div>
 
-  <div class="divider"></div>
-  <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:4px;color:rgba(212,175,55,.4);margin-bottom:8px">💬 LOBBY CHAT</div>
-  <div style="font-size:11px;color:rgba(255,255,255,.25);margin-bottom:8px;">Koordiniert euch &amp; teilt Raumcodes</div>
-  <div id="lobby-chat-msgs" style="height:90px;overflow-y:auto;background:rgba(0,0,0,.2);border:1px solid rgba(212,175,55,.1);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:4px;margin-bottom:8px;scrollbar-width:thin;"></div>
-  <div id="lobby-emoji-bar" style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;"></div>
-  <div style="display:flex;gap:8px;">
-    <input id="lobby-chat-input" class="lb-input" placeholder="Nachricht…" maxlength="120" style="flex:1;" autocomplete="off">
-    <button id="lobby-chat-send" style="background:linear-gradient(135deg,#9a7015,#d4af37);color:#1a0f00;border:none;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer;font-size:14px;flex-shrink:0;">→</button>
+  <!-- 4. Raum beitreten -->
+  <div class="divider" style="margin:10px 0;"></div>
+  <div class="lb-lbl">RAUM BEITRETEN</div>
+  <div class="join-row">
+    <input class="lb-input code" id="join-code" placeholder="1234" maxlength="4" inputmode="numeric" style="flex:0 0 100px;font-size:18px;font-weight:700;letter-spacing:6px;text-align:center;padding:10px 6px;">
+    <button class="btn-gold" id="btn-join" style="padding:10px 18px;">→</button>
   </div>
-</div>
+
+  <!-- 5. Lobby Chat -->
+  <div class="divider" style="margin:10px 0;"></div>
+  <div style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:3px;color:rgba(212,175,55,.4);margin-bottom:6px">💬 LOBBY CHAT</div>
+  <div id="lobby-chat-msgs" style="height:80px;overflow-y:auto;background:rgba(0,0,0,.2);border:1px solid rgba(212,175,55,.1);border-radius:8px;padding:6px 10px;display:flex;flex-direction:column;gap:3px;margin-bottom:6px;scrollbar-width:thin;"></div>
+  <div id="lobby-emoji-bar" style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:5px;"></div>
+  <div style="display:flex;gap:6px;">
+    <input id="lobby-chat-input" class="lb-input" placeholder="Nachricht…" maxlength="120" style="flex:1;padding:9px 10px;" autocomplete="off">
+    <button id="lobby-chat-send" style="background:linear-gradient(135deg,#9a7015,#d4af37);color:#1a0f00;border:none;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer;font-size:14px;flex-shrink:0;">→</button>
+  </div>
 </div>
 
 <!-- WAITING ROOM -->
@@ -678,14 +683,9 @@ function initLobbyChat(){
     b.style.cssText='background:none;border:none;cursor:pointer;font-size:15px;padding:2px 3px;';
     b.onclick=function(){inpEl.value+=em;inpEl.focus();};emojiEl.appendChild(b);
   });}
-  // Auto-clean messages older than 3 hours
-  var cutoff=Date.now()-10800000;
-  ref.orderByChild('ts').endAt(cutoff).once('value',function(snap){
-    snap.forEach(function(c){c.ref.remove();});
-  });
-  // Seed welcome message if empty
-  ref.limitToLast(1).once('value',function(s){
-    if(!s.exists())ref.push({sender:'Ingo',text:'Na? Kannste auch nicht schlafen?',ts:Date.now()});
+  // Clear ALL old messages and start fresh with Ingo's greeting
+  ref.remove(function(){
+    ref.push({sender:'Ingo',text:'Na? Kannste auch nicht schlafen?',ts:Date.now()});
   });
   // Listen — only last 20 messages
   ref.limitToLast(20).on('child_added',function(s){
@@ -1838,7 +1838,7 @@ function soloStart(){
 // ── MP CREATE ──
 async function mpCreate(){
   const db=getDB();if(!db)return;
-  const name=(document.getElementById('host-name').value.trim()||'Ingo').slice(0,16);
+  const name=(document.getElementById('solo-name').value.trim()||'Ingo').slice(0,16);
   MP.myName=name;MP.host=true;MP.myIdx=0;MP.NP=selectedCount;ME=0;NP=selectedCount;
   MP.roomCode=String(Math.floor(1000+Math.random()*9000));
   MP.roomRef=db.ref('rooms/sd_'+MP.roomCode);
@@ -1865,7 +1865,7 @@ async function mpCreate(){
 async function mpJoin(){
   const db=getDB();if(!db)return;
   const code=document.getElementById('join-code').value.trim();
-  const name=(document.getElementById('join-name').value.trim()||'Gast').slice(0,16);
+  const name=(document.getElementById('solo-name').value.trim()||'Gast').slice(0,16);
   if(code.length!==4){alert('4-stelligen Code eingeben!');return;}
   MP.roomRef=db.ref('rooms/sd_'+code);MP.roomCode=code;
   const snap=await MP.roomRef.once('value');
