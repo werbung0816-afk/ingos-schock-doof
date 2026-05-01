@@ -1893,13 +1893,16 @@ async function mpHostStart(){
     if(!players[i])players[i]={name:pool[pi++%pool.length]||`KI${i}`,isAI:true};
   }
   MP.players=players;NP=np;MP.NP=np;ME=0;MP.on=true;
+  const ladenStart=Math.floor(Math.random()*np); // randomize who rolls first
   G={
     phase:'laden',half:1,round:1,
     players:players.map(p=>({name:p.name,isAI:p.isAI,lids:0})),
-    middleLids:TOTAL_LIDS,currentTurn:0,firstInRound:0,
+    middleLids:TOTAL_LIDS,currentTurn:ladenStart,firstInRound:0,
     throwsAllowed:3,firstPlayerDone:false,
     playerStates:mkPS(np),
     ladenDice:Array(np).fill(null),
+    ladenDone:Array(np).fill(false),
+    ladenOrder:Array.from({length:np},(_,i)=>(i+ladenStart)%np),
     halfLosers:[null,null],markerHolder:null,finalists:[],
     lastResults:[],lastBest:-1,lastWorst:-1,lastMsg:'',gameLoser:null,
     message:'Laden — jeder würfelt einmal, höchste Zahl beginnt!',ts:Date.now()
