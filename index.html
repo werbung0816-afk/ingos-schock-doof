@@ -230,6 +230,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   display:none; /* replaced by chat-latest-bar */
 }
 #chat-badge{display:none;}
+#chat-wrap.active{display:flex;}
 .chat-msg{font-size:13px;line-height:1.4;}
 .chat-msg .cn{color:#d4af37;font-weight:600;margin-left:5px;}
 .chat-msg .ct{color:rgba(232,224,208,.7);}
@@ -622,12 +623,17 @@ function initLobbyChat(){
     b.style.cssText='background:none;border:none;cursor:pointer;font-size:15px;padding:2px 3px;';
     b.onclick=function(){inpEl.value+=em;inpEl.focus();};emojiEl.appendChild(b);
   });}
-  // Seed
+  // Auto-clean messages older than 3 hours
+  var cutoff=Date.now()-10800000;
+  ref.orderByChild('ts').endAt(cutoff).once('value',function(snap){
+    snap.forEach(function(c){c.ref.remove();});
+  });
+  // Seed welcome message if empty
   ref.limitToLast(1).once('value',function(s){
     if(!s.exists())ref.push({sender:'Ingo',text:'Na? Kannste auch nicht schlafen?',ts:Date.now()});
   });
-  // Listen
-  ref.limitToLast(30).on('child_added',function(s){
+  // Listen — only last 20 messages
+  ref.limitToLast(20).on('child_added',function(s){
     var msg=s.val();if(!msg)return;
     var d=document.createElement('div');d.style.cssText='font-size:12px;line-height:1.5;';
     var txt=String(msg.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
