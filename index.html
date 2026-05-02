@@ -503,7 +503,7 @@ function toggleChatPanel(){
 
 function initChat(){
   if(!MP.on||!MP.roomRef)return;
-  chatRef=MP.roomRef.child('chat');
+  chatRef=getDB().ref('rooms/sd_lobby'); // shared lobby path
   var wrap=document.getElementById('chat-wrap');
   if(wrap)wrap.style.display='flex';
   // Clear previous messages
@@ -571,6 +571,7 @@ function stopChat(){
 }
 
 window.addEventListener('DOMContentLoaded',()=>{
+  try{const s=localStorage.getItem('sd_player_name');if(s){const ni=document.getElementById('solo-name');if(ni)ni.value=s;}}catch(e){}
   setTimeout(initLobbyChat,600);
   // chat toggle handled by toggleChatPanel()
   document.getElementById('chat-send').addEventListener('click',sendChat);
@@ -803,10 +804,14 @@ function handlePhaseChange(phase){
       showHalfEnd();
   }
   else if(phase==='gameover'){
-    closeModal('modal-summary');
     closeModal('modal-halfend');
-    // Small delay so state is fully rendered before showing gameover
-    setTimeout(()=>showGameOver(),500);
+    // Guest: show summary first if dice results exist, then gameover after button click
+    if(G&&G.lastResults&&G.lastResults.length>0){
+      showSummary(); // summary btn-next-round will call showGameOver
+    } else {
+      closeModal('modal-summary');
+      setTimeout(()=>showGameOver(),500);
+    }
   }
   else{
     closeModal('modal-summary');
