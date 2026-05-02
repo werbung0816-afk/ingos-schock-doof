@@ -505,7 +505,7 @@ function initChat(){
   if(!MP.on||!MP.roomRef)return;
   chatRef=getDB().ref('rooms/sd_lobby'); // shared lobby path
   var wrap=document.getElementById('chat-wrap');
-  if(wrap)wrap.style.display='flex';
+  if(wrap){wrap.style.display='flex';wrap.classList.add('active');}
   // Clear previous messages
   var msgs=document.getElementById('chat-msgs');if(msgs)msgs.innerHTML='';
   var bar=document.getElementById('chat-bar-text');if(bar)bar.textContent='Antippen zum Chatten…';
@@ -534,6 +534,8 @@ function initChat(){
 }
 
 function appendChatMsg(msg){
+  // Store last msg globally for render()
+  window._sdLastChat='💬 '+escHtml(msg.text)+' <span style="color:#d4af37;font-weight:600">— '+escHtml(msg.sender)+'</span>';
   // Update bar text
   var bar=document.getElementById('chat-bar-text');
   if(bar)bar.innerHTML='<span style="color:rgba(232,224,208,.85)">'+escHtml(msg.text)+'</span><span style="color:#d4af37;font-weight:700;margin-left:5px">— '+escHtml(msg.sender)+'</span>';
