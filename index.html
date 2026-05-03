@@ -296,8 +296,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   </div>
 
   <div style="display:flex;gap:8px;margin-top:10px;">
-    <button class="btn-gold" id="btn-solo" style="flex:1;padding:11px 6px;font-size:11px;letter-spacing:1px;">SOLO →</button>
-    <button class="btn-gold" id="btn-create" style="flex:1;padding:11px 6px;font-size:11px;letter-spacing:1px;">MULTIPLAYER →</button>
+    <button class="btn-gold" id="btn-create" style="width:100%;padding:12px 8px;font-size:12px;letter-spacing:2px;">SPIEL ERSTELLEN →</button>
   </div>
 
   <div class="divider" style="margin:10px 0"></div>
@@ -1932,8 +1931,6 @@ window.addEventListener('DOMContentLoaded',()=>{
     });
   });
 
-  document.getElementById('btn-solo').addEventListener('click',soloStart);
-  document.getElementById('solo-name').addEventListener('keydown',e=>{if(e.key==='Enter')soloStart();});
   document.getElementById('btn-create').addEventListener('click',mpCreate);
   document.getElementById('btn-join').addEventListener('click',mpJoin);
   document.getElementById('join-code').addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,4);});
