@@ -35,7 +35,15 @@ body{background:var(--bg);font-family:'DM Sans',system-ui,sans-serif;color:var(-
 .btn-gold:hover{filter:brightness(1.1);}
 .btn-gold:active{transform:scale(.98);}
 .btn-ghost{display:block;width:100%;padding:11px;border-radius:8px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03);color:rgba(255,255,255,.3);cursor:pointer;font-size:13px;margin-top:8px;font-family:'DM Sans',sans-serif;}
-.join-row{display:flex;gap:8px;margin-top:8px;align-items:flex-end;}
+.open-room-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(212,175,55,.1);border:1px solid rgba(212,175,55,.3);
+  border-radius:8px;padding:6px 12px;cursor:pointer;
+  font-family:'Cinzel',serif;font-size:13px;font-weight:700;letter-spacing:3px;color:var(--gold);
+  transition:background .2s;
+}
+.open-room-chip:hover{background:rgba(212,175,55,.2);}
+.open-room-chip .chip-np{font-size:10px;color:rgba(212,175,55,.6);font-weight:400;letter-spacing:1px;}
 .join-row .lb-input.code{flex:0 0 80px;letter-spacing:6px;text-align:center;font-size:20px;font-weight:700;}
 .join-row .lb-input.name{flex:1;}
 .join-row .btn-gold{margin-top:0;width:auto;padding:12px 16px;white-space:nowrap;}
@@ -297,6 +305,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 
   <div style="display:flex;gap:8px;margin-top:10px;">
     <button class="btn-gold" id="btn-create" style="width:100%;padding:12px 8px;font-size:12px;letter-spacing:2px;">SPIEL ERSTELLEN →</button>
+  </div>
+
+  <div class="divider" style="margin:10px 0"></div>
+  <div style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:3px;color:rgba(212,175,55,.4);margin-bottom:6px">🎲 OFFENE RÄUME</div>
+  <div id="open-rooms-list" style="min-height:32px;display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;align-items:center;">
+    <span id="open-rooms-empty" style="font-size:12px;color:rgba(212,175,55,.3);font-style:italic">Keine offenen Räume</span>
   </div>
 
   <div class="divider" style="margin:10px 0"></div>
@@ -770,7 +784,8 @@ const MP={
   },
   stop(){
     if(this.roomRef&&this._listener)this.roomRef.off('value',this._listener);
-    Object.assign(this,{on:false,host:false,roomRef:null,_listener:null,roomCode:null,players:[],myIdx:0,NP:3});
+    if(this._orRef){try{this._orRef.remove();}catch(e){}}
+    Object.assign(this,{on:false,host:false,roomRef:null,_listener:null,roomCode:null,players:[],myIdx:0,NP:3,_orRef:null});
   }
 };
 
@@ -1787,6 +1802,44 @@ function showScreen(name){
   if(!el)return;
   if(el.classList.contains('screen'))el.classList.add('active');
   else el.style.display='block';
+  if(name==='lobby'&&_firebaseReady)startOpenRoomsListener();
+  else if(name!=='lobby')stopOpenRoomsListener();
+}
+
+let _orListenerHandle=null;
+let _firebaseReady=false;
+function startOpenRoomsListener(){
+  const db=getDB();if(!db)return;
+  _firebaseReady=true;
+  if(_orListenerHandle)db.ref('open_rooms').off('value',_orListenerHandle);
+  _orListenerHandle=db.ref('open_rooms').on('value',snap=>{
+    const list=document.getElementById('open-rooms-list');
+    const empty=document.getElementById('open-rooms-empty');
+    if(!list)return;
+    const data=snap.val();
+    // Remove old chips
+    list.querySelectorAll('.open-room-chip').forEach(c=>c.remove());
+    if(!data||Object.keys(data).length===0){
+      if(empty)empty.style.display='';
+      return;
+    }
+    if(empty)empty.style.display='none';
+    Object.values(data).sort((a,b)=>a.ts-b.ts).forEach(room=>{
+      const chip=document.createElement('div');
+      chip.className='open-room-chip';
+      chip.innerHTML=`<span>${room.code}</span><span class="chip-np">${room.host} · ${room.NP}P</span>`;
+      chip.addEventListener('click',()=>{
+        document.getElementById('join-code').value=room.code;
+        document.getElementById('join-code').focus();
+      });
+      list.appendChild(chip);
+    });
+  });
+}
+function stopOpenRoomsListener(){
+  const db=getDB();if(!db||!_orListenerHandle)return;
+  db.ref('open_rooms').off('value',_orListenerHandle);
+  _orListenerHandle=null;
 }
 
 // ═══════════════════════════════════════════════
@@ -1831,6 +1884,11 @@ async function mpCreate(){
   const players=[{name,isAI:false},...Array(selectedCount-1).fill(null).map(()=>({name:'',isAI:false,empty:true}))];
   MP.players=players;
   await MP.roomRef.set({status:'waiting',NP:selectedCount,players,ts:Date.now()});
+  // Register in open_rooms so lobby always shows it live
+  const orRef=db.ref('open_rooms/sd_'+MP.roomCode);
+  await orRef.set({code:MP.roomCode,host:name,NP:selectedCount,ts:Date.now()});
+  orRef.onDisconnect().remove(); // auto-cleanup on disconnect
+  MP._orRef=orRef;
   document.getElementById('wt-code').textContent=MP.roomCode;
   document.getElementById('wt-url').textContent=location.href.split('?')[0]+'?join='+MP.roomCode;
   document.getElementById('btn-mp-start').style.display='block';
@@ -1914,6 +1972,7 @@ async function mpHostStart(){
     message:'Laden — jeder würfelt einmal, höchste Zahl beginnt!',ts:Date.now()
   };
   await MP.roomRef.update({status:'playing',players,state:JSON.parse(JSON.stringify(G))});
+  try{if(MP._orRef)MP._orRef.remove();}catch(e){}
   try{var ldb3=getDB();if(ldb3)ldb3.ref('rooms/sd_lobby').remove();}catch(e){}
   showScreen('game');render();MP.schedAI();
   initChat();
@@ -1953,6 +2012,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(code){document.getElementById('join-code').value=code;}
 
   showScreen('lobby');
+  setTimeout(startOpenRoomsListener,600); // wait for Firebase to be ready
 });
 </script>
 </body>
