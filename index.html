@@ -953,7 +953,7 @@ function evalDice(d,keptCount=0){
   }
   // General: all same — always valid regardless of how achieved
   if(d1===d2&&d2===d3)
-    return{type:'general',label:'General',deckel:3,rank:3e6+4e4+d1,genVal:d1};
+    return{type:'general',label:'General',deckel:3,rank:1e6+4e4+d1,genVal:d1};
   // Straße: consecutive — always valid regardless of how achieved
   if(d2===d1+1&&d3===d1+2)
     return{type:'strasse',label:'Straße',deckel:2,rank:2e6+3e4+d1,strasseLow:d1};
