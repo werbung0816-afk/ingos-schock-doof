@@ -1884,11 +1884,13 @@ async function mpCreate(){
   const players=[{name,isAI:false},...Array(selectedCount-1).fill(null).map(()=>({name:'',isAI:false,empty:true}))];
   MP.players=players;
   await MP.roomRef.set({status:'waiting',NP:selectedCount,players,ts:Date.now()});
-  // Register in open_rooms so lobby always shows it live
-  const orRef=db.ref('open_rooms/sd_'+MP.roomCode);
-  await orRef.set({code:MP.roomCode,host:name,NP:selectedCount,ts:Date.now()});
-  orRef.onDisconnect().remove(); // auto-cleanup on disconnect
-  MP._orRef=orRef;
+  // Register in open_rooms (best-effort — requires Firebase rules to allow this path)
+  try{
+    const orRef=db.ref('open_rooms/sd_'+MP.roomCode);
+    await orRef.set({code:MP.roomCode,host:name,NP:selectedCount,ts:Date.now()});
+    orRef.onDisconnect().remove();
+    MP._orRef=orRef;
+  }catch(e){console.warn('open_rooms write failed (check Firebase rules):',e);}
   document.getElementById('wt-code').textContent=MP.roomCode;
   document.getElementById('wt-url').textContent=location.href.split('?')[0]+'?join='+MP.roomCode;
   document.getElementById('btn-mp-start').style.display='block';
