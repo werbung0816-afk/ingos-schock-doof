@@ -589,7 +589,7 @@ function stopChat(){
 window.addEventListener('DOMContentLoaded',()=>{
   try{const s=localStorage.getItem('sd_player_name');if(s){const ni=document.getElementById('solo-name');if(ni)ni.value=s;}}catch(e){}
   getDB(); // init Firebase + anonymous auth early
-  setTimeout(initLobbyChat,600);
+  _onAuthReady(initLobbyChat);
   document.getElementById('chat-send').addEventListener('click',sendChat);
   document.getElementById('chat-input').addEventListener('keydown',e=>{
     if(e.key==='Enter')sendChat();
@@ -1813,15 +1813,13 @@ function showScreen(name){
   if(!el)return;
   if(el.classList.contains('screen'))el.classList.add('active');
   else el.style.display='block';
-  if(name==='lobby'&&_firebaseReady)startOpenRoomsListener();
+  if(name==='lobby'&&_authReady)startOpenRoomsListener();
   else if(name!=='lobby')stopOpenRoomsListener();
 }
 
 let _orListenerHandle=null;
-let _firebaseReady=false;
 function startOpenRoomsListener(){
   const db=getDB();if(!db)return;
-  _firebaseReady=true;
   if(_orListenerHandle)db.ref('open_rooms').off('value',_orListenerHandle);
   _orListenerHandle=db.ref('open_rooms').on('value',snap=>{
     const list=document.getElementById('open-rooms-list');
@@ -2025,7 +2023,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(code){document.getElementById('join-code').value=code;}
 
   showScreen('lobby');
-  setTimeout(startOpenRoomsListener,600); // wait for Firebase to be ready
+  _onAuthReady(startOpenRoomsListener);
 });
 </script>
 </body>
