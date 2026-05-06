@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/firebase@10.8.1/firebase-app-compat.js"></script>
 <script src="https://unpkg.com/firebase@10.8.1/firebase-database-compat.js"></script>
+<script src="https://unpkg.com/firebase@10.8.1/firebase-auth-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -711,9 +712,19 @@ const FB_CFG={
   appId:"1:848283747928:web:5ebdf6814518ea87bdac2d"
 };
 let _db=null;
+let _authReady=false;
 function getDB(){
   if(_db)return _db;
-  try{if(!firebase.apps.length)firebase.initializeApp(FB_CFG);_db=firebase.database();return _db;}
+  try{
+    if(!firebase.apps.length)firebase.initializeApp(FB_CFG);
+    _db=firebase.database();
+    // Anonymous auth — silently sign in so Firebase rules can require auth!=null
+    if(!_authReady){
+      _authReady=true;
+      firebase.auth().signInAnonymously().catch(e=>console.warn('Auth:',e));
+    }
+    return _db;
+  }
   catch(e){alert('Firebase: '+e.message);return null;}
 }
 
@@ -968,7 +979,7 @@ function evalDice(d,keptCount=0){
   }
   // General: all same — always valid regardless of how achieved
   if(d1===d2&&d2===d3)
-    return{type:'general',label:'General',deckel:3,rank:1e6+4e4+d1,genVal:d1};
+    return{type:'general',label:'General',deckel:3,rank:2e6+4e4+d1,genVal:d1};
   // Straße: consecutive — always valid regardless of how achieved
   if(d2===d1+1&&d3===d1+2)
     return{type:'strasse',label:'Straße',deckel:2,rank:2e6+3e4+d1,strasseLow:d1};
@@ -1059,7 +1070,7 @@ function schedAI(){
 function doLaden(playerIdx){
   if(G.phase!=='laden')return;
   if(G.ladenDice[playerIdx]!==null)return;
-  G.ladenDice[playerIdx]=Math.ceil(Math.random()*6);
+  G.ladenDice[playerIdx]=Math.floor(Math.random()*6)+1;
   // Show GIF for laden roll too
   const _lcs=document.getElementById('cup-static');const _lcg=document.getElementById('cup-gif');
   if(_lcs&&_lcg){_lcs.style.display='none';_lcg.style.display='block';const _s=_lcg.src;_lcg.src='';_lcg.src=_s;clearTimeout(_lcg._t);_lcg._t=setTimeout(()=>{_lcg.style.display='none';_lcs.style.display='block';},700);}
@@ -1142,7 +1153,7 @@ function doRoll(playerIdx){
   const newDice=[...ps.dice];
   let rolled=0;
   for(let i=0;i<3;i++){
-    if(!ps.kept[i]){newDice[i]=Math.ceil(Math.random()*6);rolled++;}
+    if(!ps.kept[i]){newDice[i]=Math.floor(Math.random()*6)+1;rolled++;}
   }
   if(rolled===0)return;
   ps.dice=newDice;
