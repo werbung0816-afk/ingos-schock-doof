@@ -588,13 +588,12 @@ function stopChat(){
 
 window.addEventListener('DOMContentLoaded',()=>{
   try{const s=localStorage.getItem('sd_player_name');if(s){const ni=document.getElementById('solo-name');if(ni)ni.value=s;}}catch(e){}
+  getDB(); // init Firebase + anonymous auth early
   setTimeout(initLobbyChat,600);
-  // chat toggle handled by toggleChatPanel()
   document.getElementById('chat-send').addEventListener('click',sendChat);
   document.getElementById('chat-input').addEventListener('keydown',e=>{
     if(e.key==='Enter')sendChat();
   });
-  // emoji bar filled by initChat()
 });
 
 
@@ -713,19 +712,20 @@ const FB_CFG={
 };
 let _db=null;
 let _authReady=false;
+let _authCallbacks=[];
+function _onAuthReady(fn){if(_authReady)fn();else _authCallbacks.push(fn);}
 function getDB(){
-  if(_db)return _db;
-  try{
-    if(!firebase.apps.length)firebase.initializeApp(FB_CFG);
-    _db=firebase.database();
-    // Anonymous auth — silently sign in so Firebase rules can require auth!=null
-    if(!_authReady){
-      _authReady=true;
-      firebase.auth().signInAnonymously().catch(e=>console.warn('Auth:',e));
+  if(!_db){
+    try{
+      if(!firebase.apps.length)firebase.initializeApp(FB_CFG);
+      _db=firebase.database();
+      firebase.auth().signInAnonymously()
+        .then(()=>{_authReady=true;_authCallbacks.forEach(fn=>fn());_authCallbacks=[];})
+        .catch(e=>{console.warn('Auth:',e);_authReady=true;_authCallbacks.forEach(fn=>fn());_authCallbacks=[];});
     }
-    return _db;
+    catch(e){alert('Firebase: '+e.message);return null;}
   }
-  catch(e){alert('Firebase: '+e.message);return null;}
+  return _db;
 }
 
 // ═══════════════════════════════════════════════
@@ -2003,8 +2003,8 @@ window.addEventListener('DOMContentLoaded',()=>{
     });
   });
 
-  document.getElementById('btn-create').addEventListener('click',mpCreate);
-  document.getElementById('btn-join').addEventListener('click',mpJoin);
+  document.getElementById('btn-create').addEventListener('click',()=>{ getDB(); _onAuthReady(mpCreate); });
+  document.getElementById('btn-join').addEventListener('click',()=>{ getDB(); _onAuthReady(mpJoin); });
   document.getElementById('join-code').addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,4);});
   document.getElementById('btn-mp-start').addEventListener('click',mpHostStart);
   document.getElementById('btn-leave').addEventListener('click',()=>{MP.stop();showScreen('lobby');});
