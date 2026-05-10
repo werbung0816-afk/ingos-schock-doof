@@ -1418,26 +1418,101 @@ function runAI(pi){
     return;
   }
 
-  // AI always uses all available throws — no early stopping (game is concealed anyway).
-  // Exception: Schock Aus ends the half immediately.
+  // Schock Aus → sofort fertig
   if(combo&&combo.type==='schockAus'){doFinish(pi,false);return;}
+
+  // Kontextabhängiges frühes Aufhören
+  if(aiShouldStopEarly(pi,ps)){doFinish(pi,false);return;}
 
   // No throws left → finish
   if(throwsLeft<=0){doFinish(pi,false);return;}
 
   // Roll again
   aiMarkKeep(pi);
-  // Always roll again — AI never finishes early (keptCount<3 guaranteed since we only keep 1s)
   aiTimer=setTimeout(()=>{
     if(!G||G.phase!=='rolling'||G.currentTurn!==pi||G.playerStates[pi].done)return;
     const ps2=G.playerStates[pi];
-    // Count non-kept dice to roll
     const toRoll=ps2.dice.filter((_,i)=>!ps2.kept[i]).length;
-    if(toRoll===0){doFinish(pi,false);return;} // truly nothing to roll
+    if(toRoll===0){doFinish(pi,false);return;}
     doRoll(pi);
     aiTimer=setTimeout(()=>runAI(pi),900);
   },420);
 }
+
+// ── PROBABILISTISCHE KI-ENTSCHEIDUNG ──────────────────────────────
+// Vorberechnete Rangverteilung aller 216 möglichen Würfelergebnisse
+const _allRanks216=(()=>{
+  const out=[];
+  for(let a=1;a<=6;a++)for(let b=1;b<=6;b++)for(let c=1;c<=6;c++)
+    out.push(evalDice([a,b,c]).rank);
+  return out.sort((x,y)=>x-y);
+})();
+
+// Welchen Anteil aller Ergebnisse schlägt dieser Rang? (0=schlechtestes, 1=bestes)
+function calcRankPercentile(rank){
+  let lo=0;for(const r of _allRanks216)if(r<=rank)lo++;
+  return lo/_allRanks216.length;
+}
+
+// Welche Würfel würde die KI behalten (alle Einsen + bereits behaltene)?
+function getWouldKeep(ps){
+  return ps.dice.map((d,i)=>!!(ps.kept[i]||(d===1)));
+}
+
+// P(nächster Wurf ergibt besseren Rang) — exakte Enumeration aller Möglichkeiten
+function calcPImprove(ps){
+  if(!ps.combo)return 0;
+  const cur=ps.combo.rank;
+  const wk=getWouldKeep(ps);
+  const kept=ps.dice.filter((_,i)=>wk[i]);
+  const nRoll=3-kept.length;
+  if(nRoll===0)return 0;
+  let better=0,total=0;
+  function go(n,acc){
+    if(!n){if(evalDice([...kept,...acc]).rank>cur)better++;total++;return;}
+    for(let v=1;v<=6;v++)go(n-1,[...acc,v]);
+  }
+  go(nRoll,[]);
+  return total>0?better/total:0;
+}
+
+// Dringlichkeit der KI sich zu verbessern (0=entspannt, 1=höchste Not)
+// Faktoren: eigene Deckelposition, Qualität des Ergebnisses, Spielphase, Mittenzustand
+function calcUrgency(pi,combo){
+  const myLids=G.players[pi]?.lids||0;
+  const allLids=G.players.map(p=>p?.lids||0);
+  const maxLids=Math.max(...allLids,1);
+  const minLids=Math.min(...allLids);
+  const spread=Math.max(maxLids-minLids,1);
+  // Wie weit hinten liege ich beim Deckelstand?
+  const lidsRisk=(myLids-minLids)/spread;
+  // Wie schlecht ist mein Ergebnis im Vergleich zu allen möglichen Würfen?
+  const resultRisk=1-calcRankPercentile(combo.rank);
+  // Phasendruck: Finale > Hälfte 2 > Hälfte 1
+  const phaseFactor=G.half==='finale'?1.25:G.half===2?1.1:1.0;
+  // Mitte leer → Deckelabgabe läuft → mehr Druck
+  const middleBonus=G.middleLids===0?0.12:0;
+  return Math.min(1,(lidsRisk*0.35+resultRisk*0.50+middleBonus)*phaseFactor);
+}
+
+// Kernentscheidung: aufhören oder nochmal würfeln?
+// Stop-Schwelle sinkt mit steigender Dringlichkeit und mit mehr verbleibenden Würfen.
+// urgency=0: P(Verbesserung) muss >70% sein → nur bei fast sicherer Verbesserung nochmal
+// urgency=1: P(Verbesserung) muss >7% sein  → schon bei kleiner Chance nochmal
+function aiShouldStopEarly(pi,ps){
+  if(!ps||ps.throwNum===0)return false;
+  const combo=ps.combo;if(!combo)return false;
+  const throwsLeft=G.throwsAllowed-(ps.throwNum||0);
+  if(throwsLeft<=0)return true;
+  if(combo.type==='schockAus')return true;
+  const pImprove=calcPImprove(ps);
+  const urgency=calcUrgency(pi,combo);
+  // Mehr verbleibende Würfe → niedrigere Schwelle (mehr Chancen)
+  const baseThr=0.70-urgency*0.63;
+  const threshold=throwsLeft>1?baseThr*0.88:baseThr;
+  return pImprove<threshold;
+}
+
 // aiStep removed — runAI is the single entry point
 
 function aiMarkKeep(pi){
