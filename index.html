@@ -1425,7 +1425,7 @@ function runAI(pi){
   // Schock Aus → sofort fertig
   if(combo&&combo.type==='schockAus'){doFinish(pi,false);return;}
 
-  // Probabilistische Entscheidung — aber NICHT wenn Pflicht-Wurf nach Drehen aussteht
+  // Probabilistische Entscheidung — NICHT wenn Pflicht-Wurf nach Drehen aussteht
   if(!ps.mustRollAfterDrehen&&aiShouldStopEarly(pi,ps)){doFinish(pi,false);return;}
 
   // No throws left → finish
@@ -1444,21 +1444,20 @@ function runAI(pi){
 }
 
 // ── RETRY SYNC ──
+// Startet hängengebliebene KI neu — funktioniert in Laden- und Rolling-Phase
 function retrySync(){
-  if(!G)return;
   clearTimeout(aiTimer);
-  // KI-Züge neu starten falls hängengeblieben
-  if(G.phase==='rolling'){
-    const pi=G.currentTurn;
-    if(G.players&&G.players[pi]&&G.players[pi].isAI){
-      aiTimer=setTimeout(()=>runAI(pi),500);
-    }
+  if(!G)return;
+  const pi=G.currentTurn;
+  if((G.phase==='laden'||G.phase==='rolling')&&G.players&&G.players[pi]&&G.players[pi].isAI){
+    aiTimer=setTimeout(()=>runAI(pi),300);
   }
+  if(MP.on&&MP.host){G.ts=Date.now();MP.push();}
   render();
 }
 
 // ── PROBABILISTISCHE KI-ENTSCHEIDUNG ──────────────────────────────
-// Rangverteilung aller 216 Würfelergebnisse — lazy initialized
+// Rangverteilung aller 216 Würfelergebnisse — lazy initialized beim ersten Aufruf
 let _allRanks216=null;
 function getAllRanks(){
   if(!_allRanks216){
@@ -1519,7 +1518,8 @@ function calcUrgency(pi,combo){
 }
 
 // Kernentscheidung: jetzt aufhören oder nochmal würfeln?
-// Wird NICHT aufgerufen wenn mustRollAfterDrehen=true (Pflicht-Wurf nach Drehen).
+// urgency=0: >70% Verbesserungschance nötig  urgency=1: >7% reicht
+// Wird NICHT aufgerufen wenn mustRollAfterDrehen=true
 function aiShouldStopEarly(pi,ps){
   try{
     if(!ps||ps.throwNum===0)return false;
