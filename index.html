@@ -1444,15 +1444,26 @@ function runAI(pi){
 }
 
 // ── RETRY SYNC ──
-// Startet hängengebliebene KI neu — funktioniert in Laden- und Rolling-Phase
 function retrySync(){
   clearTimeout(aiTimer);
   if(!G)return;
-  const pi=G.currentTurn;
-  if((G.phase==='laden'||G.phase==='rolling')&&G.players&&G.players[pi]&&G.players[pi].isAI){
-    aiTimer=setTimeout(()=>runAI(pi),300);
-  }
   if(MP.on&&MP.host){G.ts=Date.now();MP.push();}
+
+  if(G.phase==='laden'){
+    // Find first AI player who hasn't rolled yet in Laden
+    const nextAI=(G.ladenOrder||[]).find(i=>G.ladenDice[i]===null&&G.players[i]?.isAI);
+    const nextAny=G.ladenDice.findIndex((d,i)=>d===null&&G.players[i]?.isAI);
+    const target=nextAI!==undefined?nextAI:nextAny;
+    if(target>=0&&target!==undefined){
+      G.currentTurn=target;
+      aiTimer=setTimeout(()=>runAI(target),300);
+    }
+  } else if(G.phase==='rolling'){
+    const pi=G.currentTurn;
+    if(G.players&&G.players[pi]&&G.players[pi].isAI&&G.playerStates&&!G.playerStates[pi]?.done){
+      aiTimer=setTimeout(()=>runAI(pi),300);
+    }
+  }
   render();
 }
 
@@ -1659,11 +1670,11 @@ function render(){
           if(d!==null)diceDiv.appendChild(makeDie(d,{size:'sm',kept:ps.kept[j]}));
         });
       } else {
-        // Vorzeitig gestoppt (throwNum < throwsAllowed) → offen zeigen
-        // Letzter Wurf (throwNum >= throwsAllowed) → verdeckt bis Auswertung
+        // Wurf 1 oder 2 stehen gelassen → offen zeigen (andere sehen was zu schlagen ist)
+        // Wurf 3 (letzter möglicher Wurf) → immer verdeckt bis Auswertung
         {
           const visKept=ps.keptVisible||[false,false,false];
-          const stoppedEarly=ps.done&&!ps.concealed&&ps.throwNum<G.throwsAllowed;
+          const stoppedEarly=ps.done&&!ps.concealed&&ps.throwNum<3;
           if(ps.throwNum>0||ps.done){
             ps.dice.forEach((d,j)=>{
               if(stoppedEarly)
