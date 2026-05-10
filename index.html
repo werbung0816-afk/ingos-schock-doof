@@ -1527,6 +1527,29 @@ function aiShouldStopEarly(pi,ps){
     const throwsLeft=(G.throwsAllowed||3)-(ps.throwNum||0);
     if(throwsLeft<=0)return true;
     if(combo.type==='schockAus')return true;
+
+    const myLids=(G.players[pi]?.lids)||0;
+    const middleEmpty=G.middleLids===0;
+    const isFirst=pi===G.firstInRound&&!G.firstPlayerDone;
+
+    // ── EXPLIZITE OVERRIDES (aus Spielerfahrung) ──────────────────
+
+    // Schock 5+ bei voller Mitte → immer auf Aus spielen
+    if(combo.type==='schock'&&combo.schockN>=5&&!middleEmpty)return false;
+
+    // Straße 4-5-6 → immer stehen lassen
+    if(combo.type==='strasse'&&combo.strasseLow>=4)return true;
+
+    // Straße 1-2-3 oder 2-3-4 → immer weiterwürfeln
+    if(combo.type==='strasse'&&combo.strasseLow<=2)return false;
+
+    // Simple als erster Spieler → 30% stehen lassen (Bremsstrategie)
+    if(combo.type==='simple'&&isFirst&&Math.random()<0.30)return true;
+
+    // 0 Deckel + Mitte leer + Schock 4+ → stehen (nichts zu gewinnen, Solidarität)
+    if(myLids===0&&middleEmpty&&combo.type==='schock'&&combo.schockN>=4)return true;
+
+    // ── PROBABILISTISCHE ENTSCHEIDUNG für alle anderen Fälle ──────
     const pImprove=calcPImprove(ps);
     const urgency=calcUrgency(pi,combo);
     const baseThr=0.70-urgency*0.63;
@@ -1636,15 +1659,18 @@ function render(){
           if(d!==null)diceDiv.appendChild(makeDie(d,{size:'sm',kept:ps.kept[j]}));
         });
       } else {
-        // Others: show kept dice face-up, rolling dice face-down; if done and not concealed, show all
+        // Others: show kept dice face-up, rolling dice face-down
+        // If done and NOT concealed: show all dice face-up (player finished openly)
         {
-          // During rolling: kept dice visible. Once done: all hidden until summary.
-          // After done: kept dice stay visible (they're on the table); non-kept stay hidden
           const visKept=ps.keptVisible||[false,false,false];
           if(ps.throwNum>0||ps.done){
             ps.dice.forEach((d,j)=>{
-              if(visKept[j]) diceDiv.appendChild(makeDie(d,{size:'sm',kept:true}));
-              else diceDiv.appendChild(makeDie(null,{size:'sm',facedown:true}));
+              if(ps.done&&!ps.concealed)
+                diceDiv.appendChild(makeDie(d,{size:'sm',kept:ps.kept[j]}));
+              else if(visKept[j])
+                diceDiv.appendChild(makeDie(d,{size:'sm',kept:true}));
+              else
+                diceDiv.appendChild(makeDie(null,{size:'sm',facedown:true}));
             });
           }
         }
