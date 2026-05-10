@@ -1659,13 +1659,14 @@ function render(){
           if(d!==null)diceDiv.appendChild(makeDie(d,{size:'sm',kept:ps.kept[j]}));
         });
       } else {
-        // Others: show kept dice face-up, rolling dice face-down
-        // If done and NOT concealed: show all dice face-up (player finished openly)
+        // Vorzeitig gestoppt (throwNum < throwsAllowed) → offen zeigen
+        // Letzter Wurf (throwNum >= throwsAllowed) → verdeckt bis Auswertung
         {
           const visKept=ps.keptVisible||[false,false,false];
+          const stoppedEarly=ps.done&&!ps.concealed&&ps.throwNum<G.throwsAllowed;
           if(ps.throwNum>0||ps.done){
             ps.dice.forEach((d,j)=>{
-              if(ps.done&&!ps.concealed)
+              if(stoppedEarly)
                 diceDiv.appendChild(makeDie(d,{size:'sm',kept:ps.kept[j]}));
               else if(visKept[j])
                 diceDiv.appendChild(makeDie(d,{size:'sm',kept:true}));
