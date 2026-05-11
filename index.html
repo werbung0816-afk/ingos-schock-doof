@@ -851,9 +851,9 @@ function fixGS(gs){
 
 function handlePhaseChange(phase){
   if(phase==='summary'){
-    // Guest always shows; host only if modal not already open
-    if(!MP.host||!document.getElementById('modal-summary').classList.contains('open'))
-      showSummary();
+    // Host already started reveal via revealThenSummary in doFinish
+    // Guest needs to start it too; guard against double-start
+    if(!G.revealInProgress)revealThenSummary();
   }
   else if(phase==='halfend'){
     if(!MP.host||!document.getElementById('modal-halfend').classList.contains('open'))
@@ -861,9 +861,8 @@ function handlePhaseChange(phase){
   }
   else if(phase==='gameover'){
     closeModal('modal-halfend');
-    // Guest: show summary first if dice results exist, then gameover after button click
     if(G&&G.lastResults&&G.lastResults.length>0){
-      showSummary(); // summary btn-next-round will call showGameOver
+      if(!G.revealInProgress)revealThenSummary();
     } else {
       closeModal('modal-summary');
       setTimeout(()=>showGameOver(),500);
@@ -1317,7 +1316,7 @@ function startNextRound(){
   G.currentTurn=nextFirst;
   NP=G.players.length;
   G.playerStates=mkPS(NP);
-  G.throwsAllowed=3;G.firstPlayerDone=false;G.revealed=null;
+  G.throwsAllowed=3;G.firstPlayerDone=false;G.revealed=null;G.revealInProgress=false;
   G.message=G.players[G.currentTurn]?`${G.players[G.currentTurn].name} ist am Zug…`:'';
   if(MP.on)MP.push();
   closeModal('modal-summary');render();schedAI();
@@ -1331,7 +1330,7 @@ function startNextHalf(){
     const st=G.halfLosers[0]??0; // fallback to player 0 if not set
     G.firstInRound=st;G.currentTurn=st;G.phase='rolling';
     NP=G.players.length;
-    G.playerStates=mkPS(NP);G.throwsAllowed=3;G.firstPlayerDone=false;G.revealed=null;
+    G.playerStates=mkPS(NP);G.throwsAllowed=3;G.firstPlayerDone=false;G.revealed=null;G.revealInProgress=false;
     G.message=`2. Hälfte — ${G.players[st]?.name||'?'} beginnt.`;
   } else {
     // Finale
@@ -1341,7 +1340,7 @@ function startNextHalf(){
     G.finalists=[G.halfLosers[0],G.halfLosers[1]].filter(x=>x!=null&&x>=0);
     G.firstInRound=st;G.currentTurn=st;G.phase='rolling';
     NP=G.players.length;
-    G.playerStates=mkPS(NP);G.throwsAllowed=3;G.firstPlayerDone=false;G.revealed=null;
+    G.playerStates=mkPS(NP);G.throwsAllowed=3;G.firstPlayerDone=false;G.revealed=null;G.revealInProgress=false;
     G.message=`Finale — ${G.players[st]?.name||'?'} beginnt.`;
   }
   G.round++;
@@ -1397,6 +1396,8 @@ function doFinish(playerIdx,concealed){
 // Deckt verdeckte letzte Würfe nacheinander auf (2s pro Spieler),
 // dann erst das Gesamtergebnis
 function revealThenSummary(){
+  if(G.revealInProgress)return;
+  G.revealInProgress=true;
   G.revealed=new Set();
   // Spieler die verdeckte Würfel hatten: done, nicht early-stopped, nicht schon offen
   const isFirst=i=>i===G.firstInRound;
