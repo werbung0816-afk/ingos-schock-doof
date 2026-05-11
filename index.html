@@ -843,6 +843,7 @@ const MP={
               if(MP._specRef)try{MP._specRef.remove();}catch(e){}
               const b=document.getElementById('spectator-badge');if(b)b.remove();
               const c=document.getElementById('spectator-controls');if(c)c.style.display='none';
+              closeModal('modal-summary');closeModal('modal-halfend');
             }
           }
 
@@ -1481,13 +1482,11 @@ function doFinish(playerIdx,concealed){
 function revealThenSummary(){
   if(G.revealInProgress)return;
   G.revealInProgress=true;
-  G.revealedIdx=-1; // welcher Spieler gerade aufgedeckt wird (-1 = keiner)
+  G.revealedIdx=-1;
 
-  // Nur KI-Spieler mit verdecktem letztem Wurf aufdecken
-  // (ME ist immer sichtbar, braucht keine Aufdeckrunde)
   const isFirst=i=>i===G.firstInRound;
   const toReveal=G.playerStates.map((ps,i)=>{
-    if(i===ME)return null; // eigene Würfel immer sichtbar
+    if(i===ME)return null;
     if(!ps.done||ps.concealed)return null;
     const stoppedEarly=ps.throwNum<G.throwsAllowed||(isFirst(i)&&ps.throwNum<3);
     return stoppedEarly?null:i;
@@ -1495,28 +1494,35 @@ function revealThenSummary(){
 
   if(toReveal.length===0){showSummary();return;}
 
-  // Maximale Wartezeit als Fallback (falls etwas schiefläuft)
-  const maxWait=setTimeout(()=>{G.revealedIdx=-1;showSummary();},toReveal.length*2500+2000);
+  const maxWait=setTimeout(()=>{
+    if(G&&(G.phase==='summary'||G.phase==='halfend'))showSummary();
+  },toReveal.length*2500+2000);
 
   let idx=0;
   const revealedSoFar=[];
+  const roundAtStart=G.round; // Runde merken — wenn Runde wechselt, Reveal abbrechen
   function revealNext(){
     try{
+      // Abbrechen wenn Phase oder Runde gewechselt hat (nächste Runde hat begonnen)
+      if(!G||G.round!==roundAtStart||
+         (G.phase!=='summary'&&G.phase!=='halfend'&&G.phase!=='gameover')){
+        clearTimeout(maxWait);return;
+      }
       if(idx>=toReveal.length){
         clearTimeout(maxWait);
         G.revealedIdx=-1;
-        setTimeout(()=>showSummary(),500);
+        setTimeout(()=>{
+          if(G&&(G.phase==='summary'||G.phase==='halfend'||G.phase==='gameover'))
+            showSummary();
+        },500);
         return;
       }
       revealedSoFar.push(toReveal[idx]);
-      G.revealedIdx=revealedSoFar.slice(); // Kopie des Arrays
+      G.revealedIdx=revealedSoFar.slice();
       idx++;
       render();
       setTimeout(revealNext,2000);
-    }catch(e){
-      clearTimeout(maxWait);
-      showSummary();
-    }
+    }catch(e){clearTimeout(maxWait);showSummary();}
   }
   setTimeout(revealNext,600);
 }
@@ -2300,6 +2306,43 @@ async function mpCreate(){ mpConnect(); }
 async function mpJoin(){ mpConnect(); }
 
 
+// Neues Spiel mit denselben Spielern — kein Lobby-Umweg
+async function mpNewGame(){
+  if(!MP.on||!MP.host||!MP.roomRef)return;
+
+  // Zuschauer die mitspielen wollen integrieren
+  await _integrateSpectators(async ()=>{
+    // Aktuelle Spieler behalten — wer gegangen ist bleibt KI
+    const players=G.players.map(p=>({name:p.name,isAI:p.isAI,lids:0}));
+    const np=players.length;
+    MP.players=players;NP=np;MP.NP=np;
+
+    const ladenStart=Math.floor(Math.random()*np);
+    G={
+      phase:'laden',half:1,round:1,
+      players,
+      middleLids:TOTAL_LIDS,currentTurn:ladenStart,firstInRound:0,
+      throwsAllowed:3,firstPlayerDone:false,
+      playerStates:mkPS(np),
+      ladenDice:Array(np).fill(null),
+      ladenDone:Array(np).fill(false),
+      ladenOrder:Array.from({length:np},(_,i)=>(i+ladenStart)%np),
+      halfLosers:[null,null],markerHolder:null,finalists:[],
+      lastResults:[],lastBest:-1,lastWorst:-1,lastMsg:'',gameLoser:null,
+      message:'Neues Spiel! Laden — jeder würfelt einmal.',
+      revealedIdx:-1,revealInProgress:false,ts:Date.now()
+    };
+    await MP.roomRef.update({
+      status:'playing',
+      players:players.map(p=>({name:p.name,isAI:p.isAI})),
+      state:JSON.parse(JSON.stringify(G)),
+      spectators:{}
+    });
+    showScreen('game');render();MP.schedAI();
+    initChat();
+  });
+}
+
 function mpRenderWaiting(room){
   const players=room?fixArr(room.players):MP.players;
   const np=room?room.NP:MP.NP;
@@ -2389,7 +2432,10 @@ window.addEventListener('DOMContentLoaded',()=>{
     MP.stop();showScreen('lobby');
   });
   document.getElementById('btn-new-game').addEventListener('click',()=>{
-    closeModal('modal-gameover');G=null;stopChat();MP.stop();showScreen('lobby');
+    closeModal('modal-gameover');
+    if(MP.on&&MP.host) mpNewGame();
+    else if(MP.on&&!MP.host){/* Gast wartet auf Host */}
+    else{G=null;stopChat();showScreen('lobby');} // Solo
   });
   document.getElementById('btn-next-half').addEventListener('click',()=>{
     if(MP.host||!MP.on)startNextHalf();
