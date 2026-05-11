@@ -834,6 +834,18 @@ const MP={
           }
           const oldPhase=G?G.phase:'';
           G=raw;NP=G.players.length;
+
+          // Zuschauer: bin ich jetzt als Spieler eingetragen?
+          if(MP.spectator&&MP.myName&&G.players){
+            const newIdx=G.players.findIndex(p=>p&&p.name===MP.myName&&!p.isAI);
+            if(newIdx>=0){
+              MP.spectator=false;MP.myIdx=newIdx;ME=newIdx;
+              if(MP._specRef)try{MP._specRef.remove();}catch(e){}
+              const b=document.getElementById('spectator-badge');if(b)b.remove();
+              const c=document.getElementById('spectator-controls');if(c)c.style.display='none';
+            }
+          }
+
           showScreen('game');
           render();
           if(MP.on&&!document.getElementById('chat-wrap').classList.contains('active'))initChat();
@@ -1352,19 +1364,19 @@ async function _integrateSpectators(callback){
     const snap=await MP.roomRef.child('spectators').once('value');
     const specs=snap.val();
     if(specs){
+      let changed=false;
       for(const [key,s] of Object.entries(specs)){
         if(!s.wantToPlay||!s.name)continue;
-        // Ersten KI-Slot in G.players finden
-        const aiSlot=G.players.findIndex((p,i)=>p.isAI);
+        const aiSlot=G.players.findIndex(p=>p.isAI);
         if(aiSlot<0)break;
         G.players[aiSlot]={name:s.name,isAI:false,lids:G.players[aiSlot].lids||0};
-        // Aus Zuschauerliste entfernen
+        changed=true;
         await MP.roomRef.child('spectators/'+key).remove();
-        // Neuen Spieler-Index merken falls das MP.myIdx ist
-        // (Zuschauer erhält neue Verbindung als Spieler beim nächsten Listen-Update)
       }
-      // Spieler-Array in Firebase aktualisieren
-      await MP.roomRef.child('players').set(G.players.map(p=>({name:p.name,isAI:p.isAI})));
+      if(changed){
+        // G.ts erhöhen damit der Firebase-Echo den alten Stand ablehnt
+        G.ts=Date.now();
+      }
     }
   }catch(e){console.warn('_integrateSpectators:',e);}
   callback();
