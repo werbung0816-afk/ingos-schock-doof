@@ -835,7 +835,6 @@ function fixGS(gs){
     dice:fixArr(s.dice),
     kept:fixArr(s.kept),
     keptDice:fixArr(s.keptDice||[]),
-    // Firebase drops false values — reconstruct keptVisible as full 3-element array
     keptVisible:Array.from({length:3},(_,i)=>!!(fixArr(s.keptVisible||[])[i]))
   }));
   // Normalize ladenDice: Firebase drops null entries, restore them as null
@@ -1318,7 +1317,7 @@ function startNextRound(){
   G.currentTurn=nextFirst;
   NP=G.players.length;
   G.playerStates=mkPS(NP);
-  G.throwsAllowed=3;G.firstPlayerDone=false;
+  G.throwsAllowed=3;G.firstPlayerDone=false;G.revealed=null;
   G.message=G.players[G.currentTurn]?`${G.players[G.currentTurn].name} ist am Zug…`:'';
   if(MP.on)MP.push();
   closeModal('modal-summary');render();schedAI();
@@ -1332,7 +1331,7 @@ function startNextHalf(){
     const st=G.halfLosers[0]??0; // fallback to player 0 if not set
     G.firstInRound=st;G.currentTurn=st;G.phase='rolling';
     NP=G.players.length;
-    G.playerStates=mkPS(NP);G.throwsAllowed=3;G.firstPlayerDone=false;
+    G.playerStates=mkPS(NP);G.throwsAllowed=3;G.firstPlayerDone=false;G.revealed=null;
     G.message=`2. Hälfte — ${G.players[st]?.name||'?'} beginnt.`;
   } else {
     // Finale
@@ -1342,7 +1341,7 @@ function startNextHalf(){
     G.finalists=[G.halfLosers[0],G.halfLosers[1]].filter(x=>x!=null&&x>=0);
     G.firstInRound=st;G.currentTurn=st;G.phase='rolling';
     NP=G.players.length;
-    G.playerStates=mkPS(NP);G.throwsAllowed=3;G.firstPlayerDone=false;
+    G.playerStates=mkPS(NP);G.throwsAllowed=3;G.firstPlayerDone=false;G.revealed=null;
     G.message=`Finale — ${G.players[st]?.name||'?'} beginnt.`;
   }
   G.round++;
@@ -1386,12 +1385,60 @@ function doFinish(playerIdx,concealed){
     return;
   }
   if(G.phase==='summary'||G.phase==='halfend'){
-    showSummary();
+    revealThenSummary();
     if(MP.on)MP.push();
   } else {
     if(MP.on)MP.push();
     schedAI();
   }
+}
+
+// ── AUFDECKSEQUENZ ──────────────────────────────────────────────────
+// Deckt verdeckte letzte Würfe nacheinander auf (2s pro Spieler),
+// dann erst das Gesamtergebnis
+function revealThenSummary(){
+  G.revealed=new Set();
+  // Spieler die verdeckte Würfel hatten: done, nicht early-stopped, nicht schon offen
+  const isFirst=i=>i===G.firstInRound;
+  const toReveal=G.playerStates.map((ps,i)=>{
+    if(!ps.done||ps.concealed)return null;
+    const stoppedEarly=ps.throwNum<G.throwsAllowed||(isFirst(i)&&ps.throwNum<3);
+    return stoppedEarly?null:i;
+  }).filter(i=>i!==null);
+
+  if(toReveal.length===0){showSummary();return;}
+
+  let idx=0;
+  function revealNext(){
+    if(idx>=toReveal.length){
+      setTimeout(()=>showSummary(),400);
+      return;
+    }
+    G.revealed.add(toReveal[idx]);
+    idx++;
+    render();
+    setTimeout(revealNext,2000);
+  }
+  // Kurze Pause vor dem ersten Aufdecken
+  setTimeout(revealNext,500);
+}
+
+// ── RETRY SYNC ──────────────────────────────────────────────────────
+function retrySync(){
+  clearTimeout(aiTimer);
+  if(!G)return;
+  if(MP.on&&MP.host){G.ts=Date.now();MP.push();}
+  if(G.phase==='laden'){
+    const nextAI=(G.ladenOrder||[]).find(i=>G.ladenDice[i]===null&&G.players[i]?.isAI);
+    const nextAny=G.ladenDice.findIndex((d,i)=>d===null&&G.players[i]?.isAI);
+    const target=nextAI!==undefined?nextAI:(nextAny>=0?nextAny:undefined);
+    if(target!==undefined){G.currentTurn=target;aiTimer=setTimeout(()=>runAI(target),300);}
+  } else if(G.phase==='rolling'){
+    const pi=G.currentTurn;
+    if(G.players?.[pi]?.isAI&&!G.playerStates?.[pi]?.done)
+      aiTimer=setTimeout(()=>runAI(pi),300);
+  }
+  render();
 }
 
 // ═══════════════════════════════════════════════
@@ -1427,173 +1474,27 @@ function runAI(pi){
     return;
   }
 
-  // Schock Aus → sofort fertig
+  // AI always uses all available throws — no early stopping (game is concealed anyway).
+  // Exception: Schock Aus ends the half immediately.
   if(combo&&combo.type==='schockAus'){doFinish(pi,false);return;}
-
-  // Probabilistische Entscheidung — NICHT wenn Pflicht-Wurf nach Drehen aussteht
-  if(!ps.mustRollAfterDrehen&&aiShouldStopEarly(pi,ps)){doFinish(pi,false);return;}
 
   // No throws left → finish
   if(throwsLeft<=0){doFinish(pi,false);return;}
 
   // Roll again
   aiMarkKeep(pi);
+  // Always roll again — AI never finishes early (keptCount<3 guaranteed since we only keep 1s)
   aiTimer=setTimeout(()=>{
     if(!G||G.phase!=='rolling'||G.currentTurn!==pi||G.playerStates[pi].done)return;
     const ps2=G.playerStates[pi];
+    // Count non-kept dice to roll
     const toRoll=ps2.dice.filter((_,i)=>!ps2.kept[i]).length;
-    if(toRoll===0){doFinish(pi,false);return;}
+    if(toRoll===0){doFinish(pi,false);return;} // truly nothing to roll
     doRoll(pi);
     aiTimer=setTimeout(()=>runAI(pi),900);
   },420);
 }
-
-// ── RETRY SYNC ──
-function retrySync(){
-  clearTimeout(aiTimer);
-  if(!G)return;
-  if(MP.on&&MP.host){G.ts=Date.now();MP.push();}
-
-  if(G.phase==='laden'){
-    // Find first AI player who hasn't rolled yet in Laden
-    const nextAI=(G.ladenOrder||[]).find(i=>G.ladenDice[i]===null&&G.players[i]?.isAI);
-    const nextAny=G.ladenDice.findIndex((d,i)=>d===null&&G.players[i]?.isAI);
-    const target=nextAI!==undefined?nextAI:nextAny;
-    if(target>=0&&target!==undefined){
-      G.currentTurn=target;
-      aiTimer=setTimeout(()=>runAI(target),300);
-    }
-  } else if(G.phase==='rolling'){
-    const pi=G.currentTurn;
-    if(G.players&&G.players[pi]&&G.players[pi].isAI&&G.playerStates&&!G.playerStates[pi]?.done){
-      aiTimer=setTimeout(()=>runAI(pi),300);
-    }
-  }
-  render();
-}
-
-// ── PROBABILISTISCHE KI-ENTSCHEIDUNG ──────────────────────────────
-// Rangverteilung aller 216 Würfelergebnisse — lazy initialized beim ersten Aufruf
-let _allRanks216=null;
-function getAllRanks(){
-  if(!_allRanks216){
-    _allRanks216=[];
-    for(let a=1;a<=6;a++)for(let b=1;b<=6;b++)for(let c=1;c<=6;c++)
-      _allRanks216.push(evalDice([a,b,c]).rank);
-    _allRanks216.sort((x,y)=>x-y);
-  }
-  return _allRanks216;
-}
-
-// Welchen Anteil aller 216 Ergebnisse schlägt dieser Rang? (0=schlecht, 1=gut)
-function calcRankPercentile(rank){
-  const ranks=getAllRanks();
-  let lo=0;for(const r of ranks)if(r<=rank)lo++;
-  return lo/ranks.length;
-}
-
-// Welche Würfel würde die KI behalten? (alle Einsen + bereits behaltene)
-function getWouldKeep(ps){
-  return ps.dice.map((d,i)=>!!(ps.kept[i]||(d===1)));
-}
-
-// P(nächster Wurf ergibt besseren Rang) — exakte Enumeration aller Möglichkeiten
-function calcPImprove(ps){
-  try{
-    if(!ps||!ps.combo||!ps.dice)return 0;
-    const cur=ps.combo.rank;
-    const wk=getWouldKeep(ps);
-    const kept=ps.dice.filter((d,i)=>wk[i]&&d!=null);
-    const nRoll=3-kept.length;
-    if(nRoll<=0)return 0;
-    let better=0,total=0;
-    function go(n,acc){
-      if(!n){if(evalDice([...kept,...acc]).rank>cur)better++;total++;return;}
-      for(let v=1;v<=6;v++)go(n-1,[...acc,v]);
-    }
-    go(nRoll,[]);
-    return total>0?better/total:0;
-  }catch(e){return 0;}
-}
-
-// Dringlichkeit der KI sich zu verbessern (0=entspannt, 1=höchste Not)
-function calcUrgency(pi,combo){
-  try{
-    if(!G||!G.players)return 0.5;
-    const myLids=(G.players[pi]?.lids)||0;
-    const allLids=G.players.map(p=>(p?.lids)||0);
-    const maxLids=Math.max(...allLids,1);
-    const minLids=Math.min(...allLids,0);
-    const spread=Math.max(maxLids-minLids,1);
-    const lidsRisk=(myLids-minLids)/spread;
-    const resultRisk=1-calcRankPercentile(combo.rank);
-    const phaseFactor=G.half==='finale'?1.25:G.half===2?1.1:1.0;
-    const middleBonus=(G.middleLids===0)?0.12:0;
-    return Math.min(1,Math.max(0,(lidsRisk*0.35+resultRisk*0.50+middleBonus)*phaseFactor));
-  }catch(e){return 0.5;}
-}
-
-// Kernentscheidung: jetzt aufhören oder nochmal würfeln?
-// urgency=0: >70% Verbesserungschance nötig  urgency=1: >7% reicht
-// Wird NICHT aufgerufen wenn mustRollAfterDrehen=true
-function aiShouldStopEarly(pi,ps){
-  try{
-    if(!ps||ps.throwNum===0)return false;
-    const combo=ps.combo;if(!combo)return false;
-    const throwsLeft=(G.throwsAllowed||3)-(ps.throwNum||0);
-    if(throwsLeft<=0)return true;
-    if(combo.type==='schockAus')return true;
-
-    const myLids=(G.players[pi]?.lids)||0;
-    const middleEmpty=G.middleLids===0;
-    const isFirst=pi===G.firstInRound&&!G.firstPlayerDone;
-
-    // ── EXPLIZITE OVERRIDES (aus Spielerfahrung) ──────────────────
-
-    // Finale: immer mindestens 2 Würfe (Ergebnis maximieren)
-    if(G.half==='finale'&&ps.throwNum<2)return false;
-
-    // Jede 1 im Würfel → immer auf Schock/Aus spielen
-    // (gilt für Schock = 2 Einsen, und für einzelne 1 die behalten wird)
-    const onesKept=ps.dice.filter((d,i)=>ps.kept[i]&&d===1).length;
-    if(onesKept>=1){
-      // Solidaritäts-Ausnahme: 0 Deckel + Mitte leer + bereits Schock (2 Einsen)
-      if(myLids===0&&middleEmpty&&onesKept>=2&&combo.schockN>=4)return true;
-      return false; // sonst immer weiterwürfeln
-    }
-
-    // General: schaut auf gegnerische sichtbare Einsen
-    if(combo.type==='general'){
-      const oppTwoOnes=G.playerStates.filter((ops,oi)=>
-        oi!==pi&&!ops.done&&ops.dice.filter((d,j)=>ops.kept[j]&&d===1).length>=2
-      ).length;
-      if(oppTwoOnes>=1)return false; // Gegner hat Schock → ich verliere → weiterwürfeln
-      const oppOneOne=G.playerStates.filter((ops,oi)=>
-        oi!==pi&&!ops.done&&ops.dice.filter((d,j)=>ops.kept[j]&&d===1).length===1
-      ).length;
-      if(oppOneOne>=2&&Math.random()<0.90)return true; // 2 Gegner mit je 1 Eins → 90% stehen
-      if(oppOneOne===1&&Math.random()<0.50)return true; // 1 Gegner mit 1 Eins → 50% stehen
-      return true; // keine Gefahr → stehen lassen
-    }
-
-    // Straße 3-4-5 oder 4-5-6 → stehen lassen
-    if(combo.type==='strasse'&&combo.strasseLow>=3)return true;
-
-    // Straße 1-2-3 oder 2-3-4 → weiterwürfeln
-    if(combo.type==='strasse'&&combo.strasseLow<=2)return false;
-
-    // Simple als erster Spieler → 30% stehen lassen (Bremsstrategie)
-    if(combo.type==='simple'&&isFirst&&Math.random()<0.30)return true;
-    if(myLids===0&&middleEmpty&&combo.type==='schock'&&combo.schockN>=4)return true;
-
-    // ── PROBABILISTISCHE ENTSCHEIDUNG für alle anderen Fälle ──────
-    const pImprove=calcPImprove(ps);
-    const urgency=calcUrgency(pi,combo);
-    const baseThr=0.70-urgency*0.63;
-    const threshold=throwsLeft>1?baseThr*0.88:baseThr;
-    return pImprove<threshold;
-  }catch(e){return false;}
-}
+// aiStep removed — runAI is the single entry point
 
 function aiMarkKeep(pi){
   const ps=G.playerStates[pi];
@@ -1696,16 +1597,19 @@ function render(){
           if(d!==null)diceDiv.appendChild(makeDie(d,{size:'sm',kept:ps.kept[j]}));
         });
       } else {
-        // Erster Spieler: offen wenn er vor Wurf 3 stehen lässt (Wurf 3 auch für Ersten verdeckt)
+        // Others: kept dice (on table) face-up, rest face-down until reveal/summary
+        // Erster Spieler: offen wenn vor Wurf 3 gestoppt
         // Andere: offen wenn throwNum < throwsAllowed (früher aufgehört)
+        // G.revealed: Spieler deren letzter Wurf gerade aufgedeckt wird
         {
           const visKept=ps.keptVisible||[false,false,false];
           const isFirst=i===G.firstInRound;
           const stoppedEarly=ps.done&&!ps.concealed&&
             (ps.throwNum<G.throwsAllowed||(isFirst&&ps.throwNum<3));
+          const revealed=G.revealed&&G.revealed.has(i);
           if(ps.throwNum>0||ps.done){
             ps.dice.forEach((d,j)=>{
-              if(stoppedEarly)
+              if(stoppedEarly||revealed)
                 diceDiv.appendChild(makeDie(d,{size:'sm',kept:ps.kept[j]}));
               else if(visKept[j])
                 diceDiv.appendChild(makeDie(d,{size:'sm',kept:true}));
