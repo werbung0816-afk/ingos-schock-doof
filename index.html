@@ -1098,7 +1098,7 @@ function schedAI(){
 function doLaden(playerIdx){
   if(G.phase!=='laden')return;
   if(G.ladenDice[playerIdx]!==null)return;
-  G.ladenDice[playerIdx]=Math.floor(Math.random()*6)+1;
+  G.ladenDice[playerIdx]=rollDie();
   // Show GIF for laden roll too
   const _lcs=document.getElementById('cup-static');const _lcg=document.getElementById('cup-gif');
   if(_lcs&&_lcg){_lcs.style.display='none';_lcg.style.display='block';const _s=_lcg.src;_lcg.src='';_lcg.src=_s;clearTimeout(_lcg._t);_lcg._t=setTimeout(()=>{_lcg.style.display='none';_lcs.style.display='block';},700);}
@@ -1181,7 +1181,7 @@ function doRoll(playerIdx){
   const newDice=[...ps.dice];
   let rolled=0;
   for(let i=0;i<3;i++){
-    if(!ps.kept[i]){newDice[i]=Math.floor(Math.random()*6)+1;rolled++;}
+    if(!ps.kept[i]){newDice[i]=rollDie();rolled++;}
   }
   if(rolled===0)return;
   ps.dice=newDice;
@@ -1277,8 +1277,15 @@ function resolveRound(){
   checkHalfEnd(worst.playerIdx);
 }
 
+// Würfelwurf mit leicht reduzierter 1er-Wahrscheinlichkeit (-25%).
+// Statt 1/6 ≈ 16.7% ist P(Eins) ≈ 12.5% — realistischer für menschliche Würfel.
+function rollDie(){
+  const r=Math.floor(Math.random()*6)+1;
+  if(r===1&&Math.random()<0.25)return Math.floor(Math.random()*5)+2;
+  return r;
+}
+
 function doKeepToggle(playerIdx,dieIdx){
-  if(G.currentTurn!==playerIdx||G.phase!=='rolling')return;
   const ps=G.playerStates[playerIdx];
   if(ps.done||ps.throwNum===0||ps.dice[dieIdx]===null)return;
   ps.kept[dieIdx]=!ps.kept[dieIdx];
