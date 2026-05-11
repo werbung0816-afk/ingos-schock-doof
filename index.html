@@ -399,8 +399,23 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
       style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;
       border-radius:50%;border:1px solid rgba(212,175,55,.3);background:none;color:var(--gold);
       cursor:pointer;font-size:16px;-webkit-tap-highlight-color:transparent;">↻</button>
+    <button onclick="leaveGame()" title="Spiel verlassen"
+      style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;
+      border-radius:50%;border:1px solid rgba(231,76,60,.25);background:none;color:rgba(231,76,60,.6);
+      cursor:pointer;font-size:14px;-webkit-tap-highlight-color:transparent;">✕</button>
   </div>
 </header>
+
+<!-- Zuschauer-Controls: Mitspielen-Button -->
+<div id="spectator-controls" style="display:none;text-align:center;padding:6px 20px;
+  background:rgba(212,175,55,.06);border-bottom:1px solid rgba(212,175,55,.1);">
+  <span style="font-size:12px;color:var(--text2);margin-right:10px;">Du schaust zu</span>
+  <button onclick="spectatorWantPlay()" id="btn-want-play"
+    style="font-size:12px;padding:5px 14px;border-radius:8px;border:1px solid rgba(212,175,55,.4);
+    background:rgba(212,175,55,.1);color:var(--gold);cursor:pointer;">
+    Nächste Runde mitspielen →
+  </button>
+</div>
 
 <div class="mitte-wrap">
   <div class="mitte-box">
@@ -415,6 +430,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   <div class="s-dot" id="s-dot" style="display:none"></div>
   <span id="status-msg"></span>
 </div>
+<div id="spectator-bar" style="display:none;text-align:center;padding:3px 20px;font-size:11px;
+  color:rgba(212,175,55,.5);letter-spacing:.5px;font-style:italic;"></div>
 
 <div class="pgrid" id="pgrid"></div>
 
@@ -781,6 +798,8 @@ const MP={
     if(!this.roomRef)return;
     this._listener=this.roomRef.on('value',snap=>{
       const room=snap.val();if(!room)return;
+      // Zuschauer-Bar immer aktualisieren
+      _updateSpectatorBar(room.spectators);
       if(room.status==='waiting'){mpRenderWaiting(room);return;}
       if(room.status==='playing'&&room.state){
         NP=room.NP||MP.NP;
@@ -819,7 +838,14 @@ const MP={
           render();
           if(MP.on&&!document.getElementById('chat-wrap').classList.contains('active'))initChat();
           if(G.phase!==oldPhase||G.phase==='summary')handlePhaseChange(G.phase);
-          if(MP.host)MP.schedAI();
+          if(MP.host){
+            // KI übernimmt für Spieler die das Spiel verlassen haben
+            if(room.players){
+              const rp=fixArr(room.players);
+              rp.forEach((p,i)=>{if(p&&p.leftGame&&p.isAI&&G&&G.players&&G.players[i]&&!G.players[i].isAI){G.players[i].isAI=true;}});
+            }
+            MP.schedAI();
+          }
         }
       }
     });
@@ -1451,6 +1477,33 @@ function revealThenSummary(){
   setTimeout(revealNext,600);
 }
 
+// ── VERLASSEN & MITSPIELEN ───────────────────────────────────────────
+
+async function leaveGame(){
+  if(!confirm('Spiel verlassen?'))return;
+  if(MP.spectator){
+    // Zuschauer verlässt: aus Firebase entfernen
+    if(MP._specRef)try{await MP._specRef.remove();}catch(e){}
+  } else if(MP.on&&!MP.host&&ME>=0&&G){
+    // Spieler verlässt: Slot wird KI
+    try{
+      await MP.roomRef.child('players/'+ME).update({isAI:true,leftGame:true});
+    }catch(e){}
+  }
+  try{sessionStorage.removeItem('sd_session');}catch(e){}
+  MP.stop();G=null;showScreen('lobby');
+}
+
+async function spectatorWantPlay(){
+  if(!MP._specRef)return;
+  try{
+    await MP._specRef.update({wantToPlay:true});
+    const btn=document.getElementById('btn-want-play');
+    if(btn){btn.textContent='✓ Wirst zur nächsten Runde hinzugefügt';btn.disabled=true;
+      btn.style.color='rgba(46,204,113,.8)';btn.style.borderColor='rgba(46,204,113,.4)';}
+  }catch(e){}
+}
+
 // ── RETRY SYNC ──────────────────────────────────────────────────────
 function retrySync(){
   clearTimeout(aiTimer);
@@ -1628,6 +1681,9 @@ function render(){
     }
   }
   document.getElementById('round-chip').textContent=`Runde ${G.round||1}`;
+  // Zuschauer-Controls ein-/ausblenden
+  const specCtrl=document.getElementById('spectator-controls');
+  if(specCtrl)specCtrl.style.display=(MP.on&&MP.spectator)?'block':'none';
 
   // Phase badge
   const pb=document.getElementById('phase-badge');
@@ -2062,6 +2118,23 @@ function soloStart(){
 }
 
 // ── MP CREATE ──
+function _updateSpectatorBar(spectators){
+  const specs=spectators?Object.values(spectators).map(s=>s.name||'?').filter(Boolean):[];
+  // Spiel-Screen Bar
+  const bar=document.getElementById('spectator-bar');
+  if(bar){
+    if(specs.length>0){bar.style.display='block';bar.textContent='👁 Zuschauer: '+specs.join(', ');}
+    else{bar.style.display='none';}
+  }
+  // Warte-Screen Box
+  const specBox=document.getElementById('wt-spectators-box');
+  const specList=document.getElementById('wt-spectators');
+  if(specBox&&specList){
+    specBox.style.display=specs.length>0?'block':'none';
+    specList.textContent=specs.join(', ');
+  }
+}
+
 async function resetRoom(){
   const db=getDB();if(!db)return;
   if(!confirm('Raum 1895 komplett löschen und neu starten?'))return;
@@ -2112,7 +2185,15 @@ function startRoomStatusWatcher(){
 // ── MP CONNECT (einheitlicher Einstieg) ───────────────────────────
 async function mpConnect(){
   const db=getDB();if(!db)return;
-  const name=(document.getElementById('solo-name').value.trim()||'Ingo').slice(0,16);
+  const nameInput=document.getElementById('solo-name');
+  const name=(nameInput.value.trim()||'').slice(0,16);
+  if(!name){
+    nameInput.style.border='1px solid rgba(231,76,60,.7)';
+    nameInput.placeholder='Name erforderlich!';
+    nameInput.focus();
+    setTimeout(()=>{nameInput.style.border='';nameInput.placeholder='Ingo';},2000);
+    return;
+  }
   localStorage.setItem('sd_player_name',name);
   MP.roomCode='1895';
   MP.roomRef=db.ref('rooms/sd_1895');
@@ -2188,24 +2269,31 @@ function mpRenderWaiting(room){
   }
   const n=players.filter(p=>p&&p.name&&!p.empty).length;
   document.getElementById('wt-sub').textContent=n+' / '+np+' Spieler';
-  // Zuschauer anzeigen
-  const specs=room&&room.spectators?Object.values(room.spectators).map(s=>s.name||'?'):[];
-  const specBox=document.getElementById('wt-spectators-box');
-  const specList=document.getElementById('wt-spectators');
-  if(specBox&&specList){
-    specBox.style.display=specs.length>0?'block':'none';
-    specList.textContent=specs.join(', ');
-  }
+  _updateSpectatorBar(room&&room.spectators);
 }
 
 async function mpHostStart(){
   if(!MP.host||!MP.roomRef)return;
   const snap=await MP.roomRef.once('value');
   const room=snap.val();
-  const np=room.NP||MP.NP;
+  let np=room.NP||MP.NP;
   const rp=fixArr(room.players);
+
+  // Zuschauer die mitspielen wollen als Spieler hinzufügen (in freie/KI-Slots)
+  const wantPlay=room.spectators?Object.entries(room.spectators)
+    .filter(([k,s])=>s.wantToPlay&&s.name)
+    .map(([k,s])=>({key:k,name:s.name})):[];
+
   const players=[];
   for(let i=0;i<np;i++)players[i]=rp[i]&&!rp[i].empty&&rp[i].name?{...rp[i],isAI:false}:null;
+
+  // Spektatoren in freie Slots einfügen
+  for(const sp of wantPlay){
+    const freeSlot=players.findIndex((p,i)=>i>0&&!p);
+    if(freeSlot>=0){players[freeSlot]={name:sp.name,isAI:false};
+    // Aus Zuschauerliste entfernen
+    try{await MP.roomRef.child('spectators/'+sp.key).remove();}catch(e){}}
+  }
   const humanNames=players.filter(Boolean).map(p=>p.name.toLowerCase());
   let pool=AI_POOL.filter(n=>!humanNames.includes(n.toLowerCase()));
   // Shuffle
