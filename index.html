@@ -1489,27 +1489,89 @@ function runAI(pi){
     return;
   }
 
-  // AI always uses all available throws — no early stopping (game is concealed anyway).
-  // Exception: Schock Aus ends the half immediately.
+  // Schock Aus → sofort fertig
   if(combo&&combo.type==='schockAus'){doFinish(pi,false);return;}
+
+  // Pflicht-Wurf nach Drehen → immer würfeln, keine Entscheidung
+  if(!ps.mustRollAfterDrehen){
+    // Entscheidung: aufhören oder nochmal?
+    if(aiShouldStopEarly(pi,ps)){doFinish(pi,false);return;}
+  }
 
   // No throws left → finish
   if(throwsLeft<=0){doFinish(pi,false);return;}
 
   // Roll again
   aiMarkKeep(pi);
-  // Always roll again — AI never finishes early (keptCount<3 guaranteed since we only keep 1s)
   aiTimer=setTimeout(()=>{
     if(!G||G.phase!=='rolling'||G.currentTurn!==pi||G.playerStates[pi].done)return;
     const ps2=G.playerStates[pi];
-    // Count non-kept dice to roll
     const toRoll=ps2.dice.filter((_,i)=>!ps2.kept[i]).length;
-    if(toRoll===0){doFinish(pi,false);return;} // truly nothing to roll
+    if(toRoll===0){doFinish(pi,false);return;}
     doRoll(pi);
     aiTimer=setTimeout(()=>runAI(pi),900);
   },420);
 }
 // aiStep removed — runAI is the single entry point
+
+// ── KI-ENTSCHEIDUNGSLOGIK ────────────────────────────────────────────
+
+// Kann die KI die Hälfte sicher nicht mehr verlieren?
+function aiCannotLose(pi, combo){
+  try{
+    const myLids=G.players[pi].lids;
+    const middleEmpty=G.middleLids===0;
+
+    // 0 Deckel + Mitte leer → nichts zu verlieren
+    if(myLids===0&&middleEmpty)return true;
+
+    // Phase 2: Schock X ≥ myLids → Sieg bedeutet alle eigenen Deckel abgeben → 0
+    if(middleEmpty&&myLids>0&&combo?.type==='schock'&&combo.schockN>=myLids)return true;
+
+    return false;
+  }catch(e){return false;}
+}
+
+// Aufhören oder nochmal würfeln?
+function aiShouldStopEarly(pi,ps){
+  try{
+    if(!ps||ps.throwNum===0)return false;
+    const combo=ps.combo;if(!combo)return false;
+    const throwsLeft=(G.throwsAllowed||3)-(ps.throwNum||0);
+    if(throwsLeft<=0)return true;
+    if(combo.type==='schockAus')return true;
+
+    // Hat irgendein Würfel eine 1? → Immer auf Aus spielen
+    // Ausnahme: sicher nicht verlierbar → stehen lassen
+    const hasAnyOne=ps.dice.some(d=>d===1);
+    if(hasAnyOne)return aiCannotLose(pi,combo);
+
+    // Kein 1er — andere Regeln:
+
+    // General → schaut auf gegnerische sichtbare Einsen
+    if(combo.type==='general'){
+      const oppSchock=G.playerStates.some((ops,oi)=>
+        oi!==pi&&!ops.done&&ops.dice.filter((d,j)=>ops.kept[j]&&d===1).length>=2);
+      if(oppSchock)return false; // Gegner hat Schock → ich verliere → nochmal
+      const oppOne=G.playerStates.some((ops,oi)=>
+        oi!==pi&&!ops.done&&ops.dice.filter((d,j)=>ops.kept[j]&&d===1).length>=1);
+      if(oppOne)return Math.random()<0.50; // Gegner hat eine 1 → 50/50
+      return true; // niemand gefährlich → stehen
+    }
+
+    // Straße 3-4-5 oder 4-5-6 → stehen
+    if(combo.type==='strasse'&&combo.strasseLow>=3)return true;
+    // Straße 1-2-3 oder 2-3-4 → weiterwürfeln
+    if(combo.type==='strasse'&&combo.strasseLow<=2)return false;
+
+    // Simple als erster Spieler → 30% stehen (Bremsstrategie)
+    if(combo.type==='simple'&&pi===G.firstInRound&&!G.firstPlayerDone&&Math.random()<0.30)
+      return true;
+
+    // Sonst immer weiterwürfeln
+    return false;
+  }catch(e){return false;}
+}
 
 function aiMarkKeep(pi){
   const ps=G.playerStates[pi];
