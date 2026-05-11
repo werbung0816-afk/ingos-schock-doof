@@ -1670,11 +1670,13 @@ function render(){
           if(d!==null)diceDiv.appendChild(makeDie(d,{size:'sm',kept:ps.kept[j]}));
         });
       } else {
-        // Wurf 1 oder 2 stehen gelassen → offen zeigen (andere sehen was zu schlagen ist)
-        // Wurf 3 (letzter möglicher Wurf) → immer verdeckt bis Auswertung
+        // Erster Spieler → immer offen (hat die Vorgabe gemacht)
+        // Andere: throwNum < throwsAllowed → offen (früher aufgehört)
+        //         throwNum >= throwsAllowed → verdeckt (alle Würfe verbraucht)
         {
           const visKept=ps.keptVisible||[false,false,false];
-          const stoppedEarly=ps.done&&!ps.concealed&&ps.throwNum<3;
+          const isFirst=i===G.firstInRound;
+          const stoppedEarly=ps.done&&!ps.concealed&&(isFirst||ps.throwNum<G.throwsAllowed);
           if(ps.throwNum>0||ps.done){
             ps.dice.forEach((d,j)=>{
               if(stoppedEarly)
