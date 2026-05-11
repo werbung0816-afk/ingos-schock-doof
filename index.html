@@ -2060,7 +2060,7 @@ async function mpCreate(){
   const db=getDB();if(!db)return;
   const name=(document.getElementById('solo-name').value.trim()||'Ingo').slice(0,16);
   MP.myName=name;MP.host=true;MP.myIdx=0;MP.NP=selectedCount;ME=0;NP=selectedCount;
-  MP.roomCode=String(Math.floor(1000+Math.random()*9000));
+  MP.roomCode='1895';
   MP.roomRef=db.ref('rooms/sd_'+MP.roomCode);
   const players=[{name,isAI:false},...Array(selectedCount-1).fill(null).map(()=>({name:'',isAI:false,empty:true}))];
   MP.players=players;
@@ -2101,6 +2101,8 @@ async function mpJoin(){
   MP.on=true;
   rp[slot]={name,isAI:false};MP.players=rp;
   await MP.roomRef.child('players').set(rp);
+  // Session speichern für Reload-Wiederverbindung
+  try{sessionStorage.setItem('sd_session',JSON.stringify({roomCode:code,slot,name}));}catch(e){}
   document.getElementById('wt-code').textContent=code;
   document.getElementById('wt-url').textContent=location.href.split('?')[0]+'?join='+code;
   showScreen('waiting');MP.listen();mpInitWaitChat();
@@ -2177,7 +2179,10 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('btn-join').addEventListener('click',()=>{ getDB(); _onAuthReady(mpJoin); });
   document.getElementById('join-code').addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,4);});
   document.getElementById('btn-mp-start').addEventListener('click',mpHostStart);
-  document.getElementById('btn-leave').addEventListener('click',()=>{MP.stop();showScreen('lobby');});
+  document.getElementById('btn-leave').addEventListener('click',()=>{
+    try{sessionStorage.removeItem('sd_session');}catch(e){}
+    MP.stop();showScreen('lobby');
+  });
   document.getElementById('btn-new-game').addEventListener('click',()=>{
     closeModal('modal-gameover');G=null;stopChat();MP.stop();showScreen('lobby');
   });
@@ -2190,9 +2195,24 @@ window.addEventListener('DOMContentLoaded',()=>{
     else startNextRound();
   });
 
-  // Auto-join from URL
-  const code=new URLSearchParams(location.search).get('join');
-  if(code){document.getElementById('join-code').value=code;}
+  // Auto-join from URL or restore session after reload
+  const urlCode=new URLSearchParams(location.search).get('join');
+  if(urlCode){
+    document.getElementById('join-code').value=urlCode;
+    // Auto-join after auth is ready
+    getDB();
+    _onAuthReady(()=>{
+      // Restore name from session if available
+      try{
+        const sess=JSON.parse(sessionStorage.getItem('sd_session')||'null');
+        if(sess&&sess.name){
+          const ni=document.getElementById('mp-name');
+          if(ni&&!ni.value)ni.value=sess.name;
+        }
+      }catch(e){}
+      mpJoin();
+    });
+  }
 
   showScreen('lobby');
   _onAuthReady(startOpenRoomsListener);
