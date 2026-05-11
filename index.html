@@ -296,9 +296,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 
   <!-- Raumstatus -->
   <div id="room-status-badge" style="text-align:center;padding:10px 14px;border-radius:10px;
-    background:rgba(0,0,0,.3);border:1px solid rgba(212,175,55,.15);margin-bottom:14px;
+    background:rgba(0,0,0,.3);border:1px solid rgba(212,175,55,.15);margin-bottom:8px;
     font-size:13px;color:var(--text2);min-height:38px;display:flex;align-items:center;justify-content:center;">
     Verbinde...
+  </div>
+  <div style="text-align:right;margin-bottom:8px">
+    <button onclick="resetRoom()" style="font-size:10px;color:rgba(212,175,55,.4);background:none;border:none;cursor:pointer;padding:2px 4px;letter-spacing:1px;">↺ Raum zurücksetzen</button>
   </div>
 
   <div class="lb-lbl">DEIN NAME</div>
@@ -2059,6 +2062,17 @@ function soloStart(){
 }
 
 // ── MP CREATE ──
+async function resetRoom(){
+  const db=getDB();if(!db)return;
+  if(!confirm('Raum 1895 komplett löschen und neu starten?'))return;
+  try{
+    await db.ref('rooms/sd_1895').remove();
+    await db.ref('open_rooms/sd_1895').remove();
+    const badge=document.getElementById('room-status-badge');
+    if(badge)badge.textContent='Raum gelöscht — du kannst neu erstellen';
+  }catch(e){alert('Fehler: '+e.message);}
+}
+
 // ── ROOM STATUS WATCHER ───────────────────────────────────────────
 let _roomStatusRef=null;
 function startRoomStatusWatcher(){
