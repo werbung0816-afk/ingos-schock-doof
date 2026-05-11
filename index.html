@@ -1345,9 +1345,37 @@ function checkHalfEnd(loserIdx){
   }
 }
 
+// Zuschauer mit wantToPlay=true in KI-Slots einsetzen (Host only)
+async function _integrateSpectators(callback){
+  if(!MP.on||!MP.host||!MP.roomRef){callback();return;}
+  try{
+    const snap=await MP.roomRef.child('spectators').once('value');
+    const specs=snap.val();
+    if(specs){
+      for(const [key,s] of Object.entries(specs)){
+        if(!s.wantToPlay||!s.name)continue;
+        // Ersten KI-Slot in G.players finden
+        const aiSlot=G.players.findIndex((p,i)=>p.isAI);
+        if(aiSlot<0)break;
+        G.players[aiSlot]={name:s.name,isAI:false,lids:G.players[aiSlot].lids||0};
+        // Aus Zuschauerliste entfernen
+        await MP.roomRef.child('spectators/'+key).remove();
+        // Neuen Spieler-Index merken falls das MP.myIdx ist
+        // (Zuschauer erhält neue Verbindung als Spieler beim nächsten Listen-Update)
+      }
+      // Spieler-Array in Firebase aktualisieren
+      await MP.roomRef.child('players').set(G.players.map(p=>({name:p.name,isAI:p.isAI})));
+    }
+  }catch(e){console.warn('_integrateSpectators:',e);}
+  callback();
+}
+
 function startNextRound(){
+  if(MP.on&&MP.host){_integrateSpectators(()=>_doStartNextRound());}
+  else _doStartNextRound();
+}
+function _doStartNextRound(){
   G.round++;G.phase='rolling';
-  // Ensure firstInRound/currentTurn is a valid participant (has lids in Phase 2)
   let nextFirst=G.lastWorst>=0?G.lastWorst:G.firstInRound;
   const nextParts=getParticipants();
   if(!nextParts.includes(nextFirst)) nextFirst=nextParts[0]||0;
@@ -1362,6 +1390,10 @@ function startNextRound(){
 }
 
 function startNextHalf(){
+  if(MP.on&&MP.host){_integrateSpectators(()=>_doStartNextHalf());}
+  else _doStartNextHalf();
+}
+function _doStartNextHalf(){
   if(!G||G.phase==='gameover')return; // guard against double-call
   if(G.half===1){
     G.half=2;
