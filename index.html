@@ -831,7 +831,12 @@ function fixGS(gs){
   const r={...gs};
   r.players=fixArr(gs.players).map(p=>({...p,lids:p.lids||0}));
   r.playerStates=fixArr(gs.playerStates).map(s=>({
-    ...s,dice:fixArr(s.dice),kept:fixArr(s.kept),keptDice:fixArr(s.keptDice||[])
+    ...s,
+    dice:fixArr(s.dice),
+    kept:fixArr(s.kept),
+    keptDice:fixArr(s.keptDice||[]),
+    // Firebase drops false values — reconstruct keptVisible as full 3-element array
+    keptVisible:Array.from({length:3},(_,i)=>!!(fixArr(s.keptVisible||[])[i]))
   }));
   // Normalize ladenDice: Firebase drops null entries, restore them as null
   const rawLaden=fixArr(gs.ladenDice||[]);
@@ -1544,6 +1549,9 @@ function aiShouldStopEarly(pi,ps){
     const isFirst=pi===G.firstInRound&&!G.firstPlayerDone;
 
     // ── EXPLIZITE OVERRIDES (aus Spielerfahrung) ──────────────────
+
+    // Finale: immer mindestens 2 Würfe (Ergebnis maximieren)
+    if(G.half==='finale'&&ps.throwNum<2)return false;
 
     // Jede 1 im Würfel → immer auf Schock/Aus spielen
     // (gilt für Schock = 2 Einsen, und für einzelne 1 die behalten wird)
