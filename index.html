@@ -1316,7 +1316,7 @@ function startNextRound(){
   G.currentTurn=nextFirst;
   NP=G.players.length;
   G.playerStates=mkPS(NP);
-  G.throwsAllowed=3;G.firstPlayerDone=false;G.revealed=null;G.revealInProgress=false;
+  G.throwsAllowed=3;G.firstPlayerDone=false;G.revealedIdx=-1;G.revealInProgress=false;
   G.message=G.players[G.currentTurn]?`${G.players[G.currentTurn].name} ist am Zug…`:'';
   if(MP.on)MP.push();
   closeModal('modal-summary');render();schedAI();
@@ -1330,7 +1330,7 @@ function startNextHalf(){
     const st=G.halfLosers[0]??0; // fallback to player 0 if not set
     G.firstInRound=st;G.currentTurn=st;G.phase='rolling';
     NP=G.players.length;
-    G.playerStates=mkPS(NP);G.throwsAllowed=3;G.firstPlayerDone=false;G.revealed=null;G.revealInProgress=false;
+    G.playerStates=mkPS(NP);G.throwsAllowed=3;G.firstPlayerDone=false;G.revealedIdx=-1;G.revealInProgress=false;
     G.message=`2. Hälfte — ${G.players[st]?.name||'?'} beginnt.`;
   } else {
     // Finale
@@ -1340,7 +1340,7 @@ function startNextHalf(){
     G.finalists=[G.halfLosers[0],G.halfLosers[1]].filter(x=>x!=null&&x>=0);
     G.firstInRound=st;G.currentTurn=st;G.phase='rolling';
     NP=G.players.length;
-    G.playerStates=mkPS(NP);G.throwsAllowed=3;G.firstPlayerDone=false;G.revealed=null;G.revealInProgress=false;
+    G.playerStates=mkPS(NP);G.throwsAllowed=3;G.firstPlayerDone=false;G.revealedIdx=-1;G.revealInProgress=false;
     G.message=`Finale — ${G.players[st]?.name||'?'} beginnt.`;
   }
   G.round++;
@@ -1398,10 +1398,13 @@ function doFinish(playerIdx,concealed){
 function revealThenSummary(){
   if(G.revealInProgress)return;
   G.revealInProgress=true;
-  G.revealed=new Set();
-  // Spieler die verdeckte Würfel hatten: done, nicht early-stopped, nicht schon offen
+  G.revealedIdx=-1; // welcher Spieler gerade aufgedeckt wird (-1 = keiner)
+
+  // Nur KI-Spieler mit verdecktem letztem Wurf aufdecken
+  // (ME ist immer sichtbar, braucht keine Aufdeckrunde)
   const isFirst=i=>i===G.firstInRound;
   const toReveal=G.playerStates.map((ps,i)=>{
+    if(i===ME)return null; // eigene Würfel immer sichtbar
     if(!ps.done||ps.concealed)return null;
     const stoppedEarly=ps.throwNum<G.throwsAllowed||(isFirst(i)&&ps.throwNum<3);
     return stoppedEarly?null:i;
@@ -1409,19 +1412,28 @@ function revealThenSummary(){
 
   if(toReveal.length===0){showSummary();return;}
 
+  // Maximale Wartezeit als Fallback (falls etwas schiefläuft)
+  const maxWait=setTimeout(()=>{G.revealedIdx=-1;showSummary();},toReveal.length*2500+2000);
+
   let idx=0;
   function revealNext(){
-    if(idx>=toReveal.length){
-      setTimeout(()=>showSummary(),400);
-      return;
+    try{
+      if(idx>=toReveal.length){
+        clearTimeout(maxWait);
+        G.revealedIdx=-1;
+        setTimeout(()=>showSummary(),500);
+        return;
+      }
+      G.revealedIdx=toReveal[idx];
+      idx++;
+      render();
+      setTimeout(revealNext,2000);
+    }catch(e){
+      clearTimeout(maxWait);
+      showSummary();
     }
-    G.revealed.add(toReveal[idx]);
-    idx++;
-    render();
-    setTimeout(revealNext,2000);
   }
-  // Kurze Pause vor dem ersten Aufdecken
-  setTimeout(revealNext,500);
+  setTimeout(revealNext,600);
 }
 
 // ── RETRY SYNC ──────────────────────────────────────────────────────
@@ -1607,7 +1619,7 @@ function render(){
           const isFirst=i===G.firstInRound;
           const stoppedEarly=ps.done&&!ps.concealed&&
             (ps.throwNum<G.throwsAllowed||(isFirst&&ps.throwNum<3));
-          const revealed=G.revealed&&G.revealed.has(i);
+          const revealed=ps.done&&!ps.concealed&&G.revealedIdx===i;
           if(ps.throwNum>0||ps.done){
             ps.dice.forEach((d,j)=>{
               if(stoppedEarly||revealed)
