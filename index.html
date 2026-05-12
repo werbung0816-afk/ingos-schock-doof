@@ -846,6 +846,13 @@ const MP={
               closeModal('modal-summary');closeModal('modal-halfend');
             }
           }
+          // Host: KI-Timer canceln wenn Spieler übernommen hat
+          if(MP.host&&G.players){
+            const curIdx=G.currentTurn;
+            if(curIdx>=0&&G.players[curIdx]&&!G.players[curIdx].isAI){
+              clearTimeout(aiTimer);
+            }
+          }
 
           showScreen('game');
           render();
@@ -1370,18 +1377,15 @@ async function _integrateSpectators(callback){
     const snap=await MP.roomRef.child('spectators').once('value');
     const specs=snap.val();
     if(specs){
-      let changed=false;
       for(const [key,s] of Object.entries(specs)){
         if(!s.wantToPlay||!s.name)continue;
         const aiSlot=G.players.findIndex(p=>p.isAI);
         if(aiSlot<0)break;
+        // Name in G.players ersetzen
         G.players[aiSlot]={name:s.name,isAI:false,lids:G.players[aiSlot].lids||0};
-        changed=true;
-        await MP.roomRef.child('spectators/'+key).remove();
-      }
-      if(changed){
-        // G.ts erhöhen damit der Firebase-Echo den alten Stand ablehnt
+        // G.ts VOR dem Remove erhöhen — blockiert Firebase-Echo-Überschreibung
         G.ts=Date.now();
+        await MP.roomRef.child('spectators/'+key).remove();
       }
     }
   }catch(e){console.warn('_integrateSpectators:',e);}
