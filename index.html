@@ -406,14 +406,14 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   </div>
 </header>
 
-<!-- Zuschauer-Controls: Mitspielen-Button -->
+<!-- Zuschauer-Controls: Sofort-Übernahme -->
 <div id="spectator-controls" style="display:none;text-align:center;padding:6px 20px;
   background:rgba(212,175,55,.06);border-bottom:1px solid rgba(212,175,55,.1);">
   <span style="font-size:12px;color:var(--text2);margin-right:10px;">Du schaust zu</span>
   <button onclick="spectatorWantPlay()" id="btn-want-play"
     style="font-size:12px;padding:5px 14px;border-radius:8px;border:1px solid rgba(212,175,55,.4);
     background:rgba(212,175,55,.1);color:var(--gold);cursor:pointer;">
-    Nächste Runde mitspielen →
+    KI übernehmen →
   </button>
 </div>
 
@@ -856,6 +856,11 @@ const MP={
             if(room.players){
               const rp=fixArr(room.players);
               rp.forEach((p,i)=>{if(p&&p.leftGame&&p.isAI&&G&&G.players&&G.players[i]&&!G.players[i].isAI){G.players[i].isAI=true;}});
+            }
+            // Sofortige KI-Übernahme durch Zuschauer
+            const specs=room.spectators?Object.values(room.spectators):[];
+            if(specs.some(s=>s&&s.wantToPlay)){
+              _integrateSpectators(()=>{if(MP.on)MP.push();render();schedAI();});
             }
             MP.schedAI();
           }
@@ -1546,11 +1551,18 @@ async function leaveGame(){
 
 async function spectatorWantPlay(){
   if(!MP._specRef)return;
+  const btn=document.getElementById('btn-want-play');
+  const ctrl=document.getElementById('spectator-controls');
   try{
     await MP._specRef.update({wantToPlay:true});
-    const btn=document.getElementById('btn-want-play');
-    if(btn){btn.textContent='✓ Wirst zur nächsten Runde hinzugefügt';btn.disabled=true;
-      btn.style.color='rgba(46,204,113,.8)';btn.style.borderColor='rgba(46,204,113,.4)';}
+    if(btn){btn.disabled=true;btn.textContent='⏳ Warte auf Übernahme…';}
+    if(ctrl){
+      let hint=ctrl.querySelector('.spec-hint');
+      if(!hint){hint=document.createElement('div');hint.className='spec-hint';
+        hint.style.cssText='font-size:11px;color:rgba(212,175,55,.6);margin-top:4px;';
+        ctrl.appendChild(hint);}
+      hint.textContent='Du übernimmst die KI — wirst sofort hinzugefügt!';
+    }
   }catch(e){}
 }
 
@@ -2187,10 +2199,15 @@ function _updateSpectatorBar(spectators){
 
 async function resetRoom(){
   const db=getDB();if(!db)return;
+  const name=(document.getElementById('solo-name').value.trim()||'');
+  const snap=await db.ref('rooms/sd_1895').once('value');
+  const room=snap.val();
+  if(room&&room.hostName&&room.hostName!==name){
+    alert('Nur der Admin ('+room.hostName+') kann den Raum zurücksetzen.');return;
+  }
   if(!confirm('Raum 1895 komplett löschen und neu starten?'))return;
   try{
     await db.ref('rooms/sd_1895').remove();
-    await db.ref('open_rooms/sd_1895').remove();
     const badge=document.getElementById('room-status-badge');
     if(badge)badge.textContent='Raum gelöscht — du kannst neu erstellen';
   }catch(e){alert('Fehler: '+e.message);}
@@ -2259,7 +2276,7 @@ async function mpConnect_asHost(name,db){
   MP.spectator=false;
   const players=[{name,isAI:false},...Array(selectedCount-1).fill(null).map(()=>({name:'',isAI:false,empty:true}))];
   MP.players=players;
-  await MP.roomRef.set({status:'waiting',NP:selectedCount,players,spectators:{},ts:Date.now()});
+  await MP.roomRef.set({status:'waiting',NP:selectedCount,players,spectators:{},hostName:name,ts:Date.now()});
   MP.roomRef.onDisconnect().remove();
   document.getElementById('btn-mp-start').style.display='block';
   showScreen('waiting');MP.listen();mpInitWaitChat();
