@@ -1613,7 +1613,7 @@ function render(){
 
     // Header
     const tags=[isMe?'<span class="tag me">(Du)</span>':'',G.markerHolder===i?'<span class="tag marker">🏷 Verlierer</span>':''].filter(Boolean).join('');
-    let html=`<div class="pcard-header"><span class="pcard-name">${p.name}</span>${tags}</div>`;
+    let html=`<div class="pcard-header"><span class="pcard-name">${p.name}${p.isAI?'<span style="font-size:8px;color:rgba(212,175,55,.35);font-family:Cinzel,serif;letter-spacing:1px;margin-left:3px">KI</span>':''}</span>${tags}</div>`;
 
     // Throw info
     if(G.phase==='laden'){
