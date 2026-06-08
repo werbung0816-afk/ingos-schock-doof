@@ -376,7 +376,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
 <div class="lobby-card">
 <div class="lobby-hero">
   <div class="lobby-avatar"><img id="ingo-logo" src="" alt="Ingo"><div class="lobby-avatar-star">&#9733;</div></div>
-  <div><div class="lobby-title-sup">I N G O &apos; S</div><div class="lobby-title">SCHOCK DOOF</div></div>
+  <div><div class="lobby-title-sup">I N G O &apos; S</div><div class="lobby-title">SCHOCK DOOF</div><div style="font-size:9px;letter-spacing:2px;color:rgba(232,224,208,.22);margin-top:2px;font-family:Cinzel,serif" id="version-lbl"></div></div>
 </div>
 <div class="lobby-body">
   <div id="room-status-badge" class="status-pill"><div class="status-indicator" id="status-indicator"></div><span id="room-status-text">Verbinde&#8230;</span></div>
@@ -444,7 +444,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
 <div id="screen-game">
 <header>
   <div class="logo-row"><img id="ingo-hdr" style="width:36px;height:36px;border-radius:50%;object-fit:cover;object-position:center 25%;border:1.5px solid rgba(212,175,55,.55);" src="" alt="Ingo"><div><div class="logo-ingos">I N G O &apos; S</div><div class="logo-main">SCHOCK DOOF</div></div></div>
-  <div class="hdr-controls"><a id="jitsi-game" href="" target="_blank" rel="noopener" title="Sprachanruf" class="hdr-btn"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.63A2 2 0 012 .82h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg></a><div class="round-chip" id="round-chip">Runde 1</div><button onclick="retrySync()" class="hdr-btn">&#x21BB;</button><button onclick="leaveGame()" class="hdr-btn red">&#x2715;</button></div>
+  <div class="hdr-controls"><a id="jitsi-game" href="" target="_blank" rel="noopener" title="Sprachanruf" class="hdr-btn"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.63A2 2 0 012 .82h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg></a><div class="round-chip" id="round-chip">Runde 1</div><div style="font-size:7px;letter-spacing:2px;color:rgba(232,224,208,.18);font-family:Cinzel,serif" id="version-hdr"></div><button onclick="retrySync()" class="hdr-btn">&#x21BB;</button><button onclick="leaveGame()" class="hdr-btn red">&#x2715;</button></div>
 </header>
 <div id="spectator-controls"><span>Du schaust zu</span><button onclick="spectatorWantPlay()" id="btn-want-play">KI &uuml;bernehmen &#x2192;</button></div>
 <div class="mitte-section"><div class="mitte-inner"><div><div class="mitte-lbl">MITTE</div><div class="mitte-number" id="mitte-num">13</div></div><div class="lid-dots" id="mitte-dots"></div><div class="mitte-right"><div class="phase-badge" id="phase-badge">1. H&auml;lfte</div></div></div></div>
@@ -473,6 +473,7 @@ window.onerror=function(msg,src,line,col,err){
 // CONSTANTS
 // ═══════════════════════════════════════════════
 const TOTAL_LIDS = 13;
+const GAME_VERSION = 'v1.6';
 const AI_POOL = ['Ingo','Micha','Holly','JP','Sebs','Gonzo','Hannes','Oli','Joschi'];
 let NP = 3;
 let ME = 0; // mein Spieler-Index
@@ -1075,6 +1076,30 @@ function mkPS(n){
   }));
 }
 
+
+// Automatische Stuck-Detection: alle 4s prüfen ob jemand 13 Deckel hat
+// aber Phase noch rolling/laden ist – passiert auf HOST automatisch
+let _stuckTimer=null;
+function _startStuckMonitor(){
+  if(_stuckTimer)clearInterval(_stuckTimer);
+  _stuckTimer=setInterval(()=>{
+    if(!G||!MP.on||!MP.host)return;
+    if(G.phase==='gameover'||G.phase==='summary'||G.phase==='halfend'||G.phase==='kaiserover')return;
+    const l13=G.players&&G.players.findIndex(p=>p.lids>=TOTAL_LIDS);
+    if(l13>=0){
+      console.warn('[StuckMonitor] '+G.players[l13].name+' hat 13 Deckel, Phase='+G.phase+' → Recovery');
+      checkHalfEnd(l13);
+      G.ts=Date.now();MP.push();
+      if(G.phase==='halfend'){
+        if(!document.getElementById('modal-halfend').classList.contains('open'))showHalfEnd();
+      } else if(G.phase==='gameover'){
+        showGameOver();
+      }
+    }
+  },4000);
+}
+function _stopStuckMonitor(){if(_stuckTimer){clearInterval(_stuckTimer);_stuckTimer=null;}}
+
 function startGame(names,aiFlags){
   NP=names.length;ME=0;
   // Randomize who rolls first in Laden
@@ -1100,6 +1125,7 @@ function startGame(names,aiFlags){
   // Biersammler-Stand vorab aus Firebase laden, damit szAutoRecord bei Spielende
   // den aktuellen Stand hat – auch wenn der Screen nie geöffnet wurde.
   szSyncFromFirebase();
+  if(MP.on&&MP.host)_startStuckMonitor();
   // In MP: sofort frischen Zustand nach Firebase pushen (löscht alten kaiserover-State)
   // und etwaige kaiserrequest-Reste bereinigen
   if(MP.on&&MP.host){
@@ -1533,6 +1559,7 @@ function revealThenSummary(){
 // ── VERLASSEN & MITSPIELEN ───────────────────────────────────────────
 
 async function leaveGame(){
+  _stopStuckMonitor();
   if(!confirm('Spiel verlassen?'))return;
   if(MP.spectator){
     // Zuschauer verlässt: aus Firebase entfernen
@@ -1754,6 +1781,7 @@ function render(){
     }
   }
   document.getElementById('round-chip').textContent=`Runde ${G.round||1}`;
+  const _vhdr=document.getElementById('version-hdr');if(_vhdr)_vhdr.textContent=GAME_VERSION;
   // Zuschauer-Controls ein-/ausblenden
   const specCtrl=document.getElementById('spectator-controls');
   if(specCtrl)specCtrl.style.display=(MP.on&&MP.spectator)?'block':'none';
@@ -2782,6 +2810,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   const code=new URLSearchParams(location.search).get('join');
   if(code){document.getElementById('join-code').value=code;}
 
+  const _vlbl=document.getElementById('version-lbl');if(_vlbl)_vlbl.textContent=GAME_VERSION;
   showScreen('lobby');
   _onAuthReady(()=>{startRoomStatusWatcher();startOpenRoomsListener();});
 });
