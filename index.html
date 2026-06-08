@@ -732,8 +732,7 @@ const MP={
       const req=snap.val();if(!req)return;
       G.kaiserrunde=true;
       G.kaiserrundeBy=req.by||'?';
-      G.kaiserTargetRound=G.round+1;
-      G.kaiserReady=false;
+      G.kaiserGamesPlayed=G.kaiserGamesPlayed||0;
       try{this.roomRef.child('kaiserrequest').remove();}catch(e){}
       MP.push();render();
     });
@@ -851,11 +850,6 @@ function fixGS(gs){
 function handlePhaseChange(phase){
   if(phase==='kaiserover'){
     if(!document.getElementById('modal-kaiser').classList.contains('open'))showKaiserrundeEnd();
-    return;
-  }
-  // Kaiserrunde aktiv: halfend/gameover nicht als Modal zeigen – Summary übernimmt
-  if(G&&G.kaiserrunde&&G.kaiserTargetRound>0&&(phase==='halfend'||phase==='gameover')){
-    if(!G.revealInProgress)revealThenSummary();
     return;
   }
   if(phase==='summary'){
@@ -1069,6 +1063,10 @@ function startGame(names,aiFlags){
   NP=names.length;ME=0;
   // Randomize who rolls first in Laden
   const ladenStart=Math.floor(Math.random()*names.length);
+  // Kaiser-Zustand über automatische Neustarts hinweg erhalten
+  const _pk=G?{k:G.kaiserrunde||false,by:G.kaiserrundeBy||null,
+                gp:(G.kaiserGamesPlayed||0),ss:G.sessionStart||Date.now()}
+              :{k:false,by:null,gp:0,ss:Date.now()};
   G={
     phase:'laden',half:1,round:1,
     players:names.map((n,i)=>({name:n,isAI:aiFlags[i],lids:0})),
@@ -1080,7 +1078,7 @@ function startGame(names,aiFlags){
     ladenOrder:Array.from({length:NP},(_,i)=>(i+ladenStart)%NP), // randomized order
     halfLosers:[null,null],markerHolder:null,finalists:[],
     lastResults:[],lastBest:-1,lastWorst:-1,lastMsg:'',gameLoser:null,
-    kaiserrunde:false,kaiserrundeBy:null,kaiserTargetRound:0,kaiserReady:false,sessionStart:Date.now(),
+    kaiserrunde:_pk.k,kaiserrundeBy:_pk.by,kaiserGamesPlayed:_pk.gp,sessionStart:_pk.ss,
     message:'Laden — jeder würfelt einmal, höchste Zahl beginnt!',ts:Date.now()
   };
   // Biersammler-Stand vorab aus Firebase laden, damit szAutoRecord bei Spielende
@@ -1365,8 +1363,6 @@ function startNextRound(){
 }
 function _doStartNextRound(){
   G.round++;G.phase='rolling';
-  // Kaiserrunde: sobald die Zielrunde gestartet wird, Ready-Flag setzen
-  if(G.kaiserrunde&&G.kaiserTargetRound>0&&G.round>=G.kaiserTargetRound)G.kaiserReady=true;
   let nextFirst=G.lastWorst>=0?G.lastWorst:G.firstInRound;
   const nextParts=getParticipants();
   if(!nextParts.includes(nextFirst)) nextFirst=nextParts[0]||0;
@@ -1975,16 +1971,15 @@ function clickKaiserRunde(){
   // Host oder Solo: direkt anwenden
   G.kaiserrunde=true;
   G.kaiserrundeBy=myName;
-  G.kaiserTargetRound=G.round+1; // nächste Runde ist die Kaiserrunde
-  G.kaiserReady=false;
+  G.kaiserGamesPlayed=G.kaiserGamesPlayed||0;
   if(MP.on)MP.push();
   render();
   szToast('\uD83D\uDC51 Kaiserrunde! Noch eine letzte Runde.');
 }
 
 function showKaiserrundeEnd(){
-  // Sicherheits-Guard: nur feuern wenn Host explizit Ready gesetzt hat
-  if(MP.on&&MP.host&&!G?.kaiserReady)return;
+  // Sicherheits-Guard: nur feuern wenn mindestens 2 komplette Spiele gespielt wurden
+  if(MP.on&&MP.host&&(G?.kaiserGamesPlayed||0)<2)return;
   launchConfetti();
   const st=szLoad();
   const stats=szGetStats(st);
@@ -2112,22 +2107,6 @@ else comboEl.textContent=dl; // simple: just show dice values
   } else {
     btn.style.display='block';
     btn.disabled=false;btn.textContent='Nächste Runde →';btn.onclick=()=>{
-      // Kaiserrunde hat Vorrang vor normalem Spielende
-      if(G.kaiserrunde&&G.kaiserTargetRound>0){
-        // Gameover/Halfend still verarbeiten und Lids zurücksetzen
-        if(G.phase==='gameover'&&G.gameLoser!=null){
-          szAutoRecord(G.players[G.gameLoser]?.name||'?',G.players);
-        }
-        if(G.phase==='gameover'||G.phase==='halfend'){
-          G.players.forEach(p=>p.lids=0);G.middleLids=TOTAL_LIDS;
-          G.gameLoser=null;G.halfLosers=[null,null];G.finalists=[];G.half=1;
-          G.phase='summary'; // damit _doStartNextRound ungehindert starten kann
-        }
-        if(G.kaiserReady){showKaiserrundeEnd();}
-        else startNextRound();
-        return;
-      }
-      // Normaler Spielfluss
       if(G.phase==='gameover'){closeModal('modal-summary');showGameOver();return;}
       if(G.phase==='halfend'){closeModal('modal-summary');showHalfEnd();}
       else startNextRound();
@@ -2184,6 +2163,26 @@ function showGameOver(){
   const loserIdx=G.gameLoser;
   const loserName=G.players[loserIdx]?G.players[loserIdx].name:'?';
   szAutoRecord(loserName,G.players);
+
+  // ── KAISERRUNDE: ein komplettes Spiel folgt noch ──────────────────────────
+  if(G.kaiserrunde){
+    G.kaiserGamesPlayed=(G.kaiserGamesPlayed||0)+1;
+    if(MP.on&&MP.host)MP.push(); // gamesPlayed synchronisieren
+    if(G.kaiserGamesPlayed<2){
+      // Laufendes Spiel gerade fertig → Kaiserrunde (letztes Spiel) starten
+      const _kNames=G.players.map(p=>p.name);
+      const _kAI=G.players.map(p=>!!p.isAI);
+      closeModal('modal-summary');closeModal('modal-halfend');closeModal('modal-gameover');
+      szToast('\uD83D\uDC51 Kaiserrunde beginnt — letztes Spiel!');
+      setTimeout(()=>startGame(_kNames,_kAI),1200);
+      return;
+    } else {
+      // Kaiserrunde (letztes Spiel) auch fertig → Ergebnis zeigen
+      showKaiserrundeEnd();
+      return;
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
   const winners=G.players.filter((_,i)=>i!==loserIdx).map(p=>p.name);
   const winnersText=winners.length===1
     ?`${winners[0]} gewinnt`
@@ -2529,7 +2528,7 @@ async function mpHostStart(){
     ladenOrder:Array.from({length:np},(_,i)=>(i+ladenStart)%np),
     halfLosers:[null,null],markerHolder:null,finalists:[],
     lastResults:[],lastBest:-1,lastWorst:-1,lastMsg:'',gameLoser:null,
-    kaiserrunde:false,kaiserrundeBy:null,kaiserTargetRound:0,kaiserReady:false,sessionStart:Date.now(),
+    kaiserrunde:false,kaiserrundeBy:null,kaiserGamesPlayed:0,sessionStart:Date.now(),
     message:'Laden — jeder würfelt einmal, höchste Zahl beginnt!',ts:Date.now()
   };
   await MP.roomRef.update({status:'playing',players,state:JSON.parse(JSON.stringify(G)),spectators:{}});
