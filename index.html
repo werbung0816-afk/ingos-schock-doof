@@ -799,6 +799,22 @@ const MP={
           if(MP.on&&!document.getElementById('chat-wrap').classList.contains('active'))initChat();
           if(G.phase!==oldPhase||G.phase==='summary')handlePhaseChange(G.phase);
           if(MP.host){
+            // Kaiserrequest im main-listener als Fallback (doppelte Absicherung)
+            if(room.kaiserrequest&&G&&!G.kaiserrunde){
+              const _kreq=room.kaiserrequest;
+              G.kaiserrunde=true;G.kaiserrundeBy=_kreq.by||'?';
+              G.kaiserGamesPlayed=G.kaiserGamesPlayed||0;
+              try{MP.roomRef.child('kaiserrequest').remove();}catch(e){}
+              MP.push();render();
+            }
+            // Kaiserrequest-Fallback im main-listener
+            if(room.kaiserrequest&&G&&!G.kaiserrunde){
+              const _kreq=room.kaiserrequest;
+              G.kaiserrunde=true;G.kaiserrundeBy=_kreq.by||'?';
+              G.kaiserGamesPlayed=G.kaiserGamesPlayed||0;
+              try{MP.roomRef.child('kaiserrequest').remove();}catch(e){}
+              MP.push();render();
+            }
             // KI übernimmt für Spieler die das Spiel verlassen haben
             if(room.players){
               const rp=fixArr(room.players);
@@ -1091,6 +1107,9 @@ function startGame(names,aiFlags){
     G.ts=Date.now();
     MP.push();
   }
+  // Alle ggf. noch offenen Modals aus dem vorherigen Spiel schließen
+  ['modal-gameover','modal-summary','modal-halfend','modal-kaiser']
+    .forEach(id=>closeModal(id));
   showScreen('game');render();
   schedAI();
 }
@@ -1963,9 +1982,13 @@ function clickKaiserRunde(){
   if(!G||G.kaiserrunde)return;
   const myName=G.players[ME]?.name||'?';
   if(MP.on&&!MP.host){
-    // Gast: nur kleines Signal an Host — KEIN vollst\u00e4ndiger State-Push!
-    try{MP.roomRef.child('kaiserrequest').set({by:myName,ts:Date.now()});}
-    catch(e){console.error('kaiserrequest:',e);}
+    // Gast: Signal an Host senden
+    if(!MP.roomRef){szToast('Fehler: keine Verbindung');return;}
+    try{
+      MP.roomRef.child('kaiserrequest').set({by:myName,ts:Date.now()})
+        .then(()=>szToast('\uD83D\uDC51 Kaiserrunde angek\xFCndigt!'))
+        .catch(e=>{console.error('kaiserrequest:',e);szToast('Fehler beim Senden');});
+    }catch(e){console.error('kaiserrequest sync:',e);szToast('Fehler beim Senden');}
     return;
   }
   // Host oder Solo: direkt anwenden
@@ -2167,17 +2190,17 @@ function showGameOver(){
   // ── KAISERRUNDE: ein komplettes Spiel folgt noch ──────────────────────────
   if(G.kaiserrunde){
     G.kaiserGamesPlayed=(G.kaiserGamesPlayed||0)+1;
-    if(MP.on&&MP.host)MP.push(); // gamesPlayed synchronisieren
     if(G.kaiserGamesPlayed<2){
-      // Laufendes Spiel gerade fertig → Kaiserrunde (letztes Spiel) starten
+      // Laufendes Spiel fertig → Kaiserrunde direkt starten (KEIN separates Push
+      // und KEIN setTimeout – das würde via Echo showGameOver ein zweites Mal triggern)
       const _kNames=G.players.map(p=>p.name);
       const _kAI=G.players.map(p=>!!p.isAI);
       closeModal('modal-summary');closeModal('modal-halfend');closeModal('modal-gameover');
+      startGame(_kNames,_kAI); // startGame pusht intern und erhält Kaiser-Zustand
       szToast('\uD83D\uDC51 Kaiserrunde beginnt — letztes Spiel!');
-      setTimeout(()=>startGame(_kNames,_kAI),1200);
       return;
     } else {
-      // Kaiserrunde (letztes Spiel) auch fertig → Ergebnis zeigen
+      // Kaiserrunde auch fertig → Ergebnis zeigen
       showKaiserrundeEnd();
       return;
     }
