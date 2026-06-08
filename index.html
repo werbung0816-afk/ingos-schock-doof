@@ -1117,9 +1117,19 @@ function startGame(names,aiFlags){
 function schedAI(){
   clearTimeout(aiTimer);
   if(!G||G.phase==='gameover'||G.phase==='summary'||G.phase==='halfend')return;
-  // Additional safety: if someone has all 13 lids, trigger gameover
+  // Safety: wenn jemand 13 Deckel hat und Phase noch 'rolling'/'laden', korrektes Ende auslösen
   {const l13=G.players&&G.players.findIndex(p=>p.lids>=TOTAL_LIDS);
-  if(l13>=0){G.phase='gameover';G.gameLoser=l13;showGameOver();return;}}
+  if(l13>=0){
+    checkHalfEnd(l13); // setzt phase korrekt (halfend ODER gameover je nach Hälfte)
+    if(G.phase==='halfend'){
+      if(MP.on&&MP.host)MP.push();
+      if(!document.getElementById('modal-halfend').classList.contains('open'))showHalfEnd();
+    } else if(G.phase==='gameover'){
+      if(MP.on&&MP.host)MP.push();
+      showGameOver();
+    }
+    return;
+  }}
   if(MP.on&&!MP.host)return;
   const p=G.currentTurn;
   if(p===undefined||p===null||!G.players||!G.players[p])return;
@@ -1558,6 +1568,19 @@ async function spectatorWantPlay(){
 function retrySync(){
   clearTimeout(aiTimer);
   if(!G)return;
+  // Stuck-Detection: jemand hat 13 Deckel aber Phase ist noch rolling/laden
+  {const l13=G.players&&G.players.findIndex(p=>p.lids>=TOTAL_LIDS);
+  if(l13>=0&&(G.phase==='rolling'||G.phase==='laden')){
+    checkHalfEnd(l13);
+    if(MP.on&&MP.host){G.ts=Date.now();MP.push();}
+    if(G.phase==='halfend'){
+      if(!document.getElementById('modal-halfend').classList.contains('open'))showHalfEnd();
+    } else if(G.phase==='gameover'){
+      showGameOver();
+    }
+    szToast('Feststeckenden Zustand behoben');
+    return;
+  }}
   if(MP.on&&MP.host){G.ts=Date.now();MP.push();}
   if(G.phase==='laden'){
     const nextAI=(G.ladenOrder||[]).find(i=>G.ladenDice[i]===null&&G.players[i]?.isAI);
