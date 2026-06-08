@@ -726,6 +726,16 @@ const MP={
   },
   listen(){
     if(!this.roomRef)return;
+    // Dedizierter Listener für Kaiserrunde-Anfragen (zuverlässiger als im main listener)
+    this._kaiserReqListener=this.roomRef.child('kaiserrequest').on('value',snap=>{
+      if(!MP.host||!G||G.kaiserrunde)return;
+      const req=snap.val();if(!req)return;
+      G.kaiserrunde=true;
+      G.kaiserrundeBy=req.by||'?';
+      G.kaiserTargetRound=G.round+1;
+      try{this.roomRef.child('kaiserrequest').remove();}catch(e){}
+      MP.push();render();
+    });
     this._listener=this.roomRef.on('value',snap=>{
       const room=snap.val();if(!room)return;
       // Zuschauer-Bar immer aktualisieren
@@ -789,16 +799,6 @@ const MP={
           if(MP.on&&!document.getElementById('chat-wrap').classList.contains('active'))initChat();
           if(G.phase!==oldPhase||G.phase==='summary')handlePhaseChange(G.phase);
           if(MP.host){
-            // Kaiserrunde-Anfrage eines Gastes verarbeiten
-            if(room.kaiserrequest&&G&&!G.kaiserrunde){
-              const req=room.kaiserrequest;
-              G.kaiserrunde=true;
-              G.kaiserrundeBy=req.by||'?';
-              G.kaiserTargetRound=G.round+1; // nächste Runde ist die Kaiserrunde
-              try{MP.roomRef.child('kaiserrequest').remove();}catch(e){}
-              MP.push();
-              render();
-            }
             // KI übernimmt für Spieler die das Spiel verlassen haben
             if(room.players){
               const rp=fixArr(room.players);
@@ -816,6 +816,7 @@ const MP={
     });
   },
   stop(){
+    if(this.roomRef&&this._kaiserReqListener)this.roomRef.child('kaiserrequest').off('value',this._kaiserReqListener);
     if(this.roomRef&&this._listener)this.roomRef.off('value',this._listener);
     if(this._orRef){try{this._orRef.remove();}catch(e){}}
     Object.assign(this,{on:false,host:false,roomRef:null,_listener:null,roomCode:null,players:[],myIdx:0,NP:3,_orRef:null});
@@ -849,6 +850,11 @@ function fixGS(gs){
 function handlePhaseChange(phase){
   if(phase==='kaiserover'){
     if(!document.getElementById('modal-kaiser').classList.contains('open'))showKaiserrundeEnd();
+    return;
+  }
+  // Kaiserrunde aktiv: halfend/gameover nicht als Modal zeigen – Summary übernimmt
+  if(G&&G.kaiserrunde&&G.kaiserTargetRound>0&&(phase==='halfend'||phase==='gameover')){
+    if(!G.revealInProgress)revealThenSummary();
     return;
   }
   if(phase==='summary'){
@@ -2100,10 +2106,24 @@ else comboEl.textContent=dl; // simple: just show dice values
   } else {
     btn.style.display='block';
     btn.disabled=false;btn.textContent='Nächste Runde →';btn.onclick=()=>{
+      // Kaiserrunde hat Vorrang vor normalem Spielende
+      if(G.kaiserrunde&&G.kaiserTargetRound>0){
+        // Gameover/Halfend still verarbeiten und Lids zurücksetzen
+        if(G.phase==='gameover'&&G.gameLoser!=null){
+          szAutoRecord(G.players[G.gameLoser]?.name||'?',G.players);
+        }
+        if(G.phase==='gameover'||G.phase==='halfend'){
+          G.players.forEach(p=>p.lids=0);G.middleLids=TOTAL_LIDS;
+          G.gameLoser=null;G.halfLosers=[null,null];G.finalists=[];G.half=1;
+          G.phase='summary'; // damit _doStartNextRound ungehindert starten kann
+        }
+        if(G.round>=G.kaiserTargetRound){showKaiserrundeEnd();}
+        else startNextRound();
+        return;
+      }
+      // Normaler Spielfluss
       if(G.phase==='gameover'){closeModal('modal-summary');showGameOver();return;}
       if(G.phase==='halfend'){closeModal('modal-summary');showHalfEnd();}
-      else if(G.kaiserrunde&&G.kaiserTargetRound>0&&G.round>=G.kaiserTargetRound){showKaiserrundeEnd();}
-      else if(G.kaiserrunde){startNextRound();}
       else startNextRound();
     };
   }
