@@ -789,6 +789,16 @@ const MP={
           if(MP.on&&!document.getElementById('chat-wrap').classList.contains('active'))initChat();
           if(G.phase!==oldPhase||G.phase==='summary')handlePhaseChange(G.phase);
           if(MP.host){
+            // Kaiserrunde-Anfrage eines Gastes verarbeiten
+            if(room.kaiserrequest&&G&&!G.kaiserrunde){
+              const req=room.kaiserrequest;
+              G.kaiserrunde=true;
+              G.kaiserrundeBy=req.by||'?';
+              G.kaiserTargetRound=G.round+1; // nächste Runde ist die Kaiserrunde
+              try{MP.roomRef.child('kaiserrequest').remove();}catch(e){}
+              MP.push();
+              render();
+            }
             // KI übernimmt für Spieler die das Spiel verlassen haben
             if(room.players){
               const rp=fixArr(room.players);
@@ -837,6 +847,10 @@ function fixGS(gs){
 }
 
 function handlePhaseChange(phase){
+  if(phase==='kaiserover'){
+    if(!document.getElementById('modal-kaiser').classList.contains('open'))showKaiserrundeEnd();
+    return;
+  }
   if(phase==='summary'){
     // Host already started reveal via revealThenSummary in doFinish
     // Guest needs to start it too; guard against double-start
@@ -1059,12 +1073,19 @@ function startGame(names,aiFlags){
     ladenOrder:Array.from({length:NP},(_,i)=>(i+ladenStart)%NP), // randomized order
     halfLosers:[null,null],markerHolder:null,finalists:[],
     lastResults:[],lastBest:-1,lastWorst:-1,lastMsg:'',gameLoser:null,
-    kaiserrunde:false,kaiserrundeBy:null,kaiserrundeRound:null,sessionStart:Date.now(),
+    kaiserrunde:false,kaiserrundeBy:null,kaiserTargetRound:0,sessionStart:Date.now(),
     message:'Laden — jeder würfelt einmal, höchste Zahl beginnt!',ts:Date.now()
   };
   // Biersammler-Stand vorab aus Firebase laden, damit szAutoRecord bei Spielende
   // den aktuellen Stand hat – auch wenn der Screen nie geöffnet wurde.
   szSyncFromFirebase();
+  // In MP: sofort frischen Zustand nach Firebase pushen (löscht alten kaiserover-State)
+  // und etwaige kaiserrequest-Reste bereinigen
+  if(MP.on&&MP.host){
+    try{MP.roomRef.child('kaiserrequest').remove();}catch(e){}
+    G.ts=Date.now();
+    MP.push();
+  }
   showScreen('game');render();
   schedAI();
 }
@@ -1935,12 +1956,20 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
 
 function clickKaiserRunde(){
   if(!G||G.kaiserrunde)return;
+  const myName=G.players[ME]?.name||'?';
+  if(MP.on&&!MP.host){
+    // Gast: nur kleines Signal an Host — KEIN vollst\u00e4ndiger State-Push!
+    try{MP.roomRef.child('kaiserrequest').set({by:myName,ts:Date.now()});}
+    catch(e){console.error('kaiserrequest:',e);}
+    return;
+  }
+  // Host oder Solo: direkt anwenden
   G.kaiserrunde=true;
-  G.kaiserrundeBy=G.players[ME]?.name||'?';
-  G.kaiserrundeRound=G.round;
+  G.kaiserrundeBy=myName;
+  G.kaiserTargetRound=G.round+1; // nächste Runde ist die Kaiserrunde
   if(MP.on)MP.push();
   render();
-  szToast('\u1F451 Kaiserrunde! Noch eine letzte Runde.');
+  szToast('\uD83D\uDC51 Kaiserrunde! Noch eine letzte Runde.');
 }
 
 function showKaiserrundeEnd(){
@@ -2005,8 +2034,12 @@ function showKaiserrundeEnd(){
   document.getElementById('kaiser-content').innerHTML=html;
   document.getElementById('btn-kaiser-done').onclick=()=>{
     closeModal('modal-kaiser');
+    if(MP.on){try{MP.roomRef.child('kaiserrequest').remove();}catch(e){}}
+    MP.stop();G=null;
     showScreen('lobby');
+    _onAuthReady(()=>{startRoomStatusWatcher();startOpenRoomsListener();});
   };
+  if(MP.on&&MP.host){G.phase='kaiserover';G.ts=Date.now();MP.push();}
   closeModal('modal-summary');closeModal('modal-halfend');
   openModal('modal-kaiser');
 }
@@ -2069,7 +2102,7 @@ else comboEl.textContent=dl; // simple: just show dice values
     btn.disabled=false;btn.textContent='Nächste Runde →';btn.onclick=()=>{
       if(G.phase==='gameover'){closeModal('modal-summary');showGameOver();return;}
       if(G.phase==='halfend'){closeModal('modal-summary');showHalfEnd();}
-      else if(G.kaiserrunde&&G.round>G.kaiserrundeRound){showKaiserrundeEnd();}
+      else if(G.kaiserrunde&&G.kaiserTargetRound>0&&G.round>=G.kaiserTargetRound){showKaiserrundeEnd();}
       else if(G.kaiserrunde){startNextRound();}
       else startNextRound();
     };
@@ -2470,7 +2503,7 @@ async function mpHostStart(){
     ladenOrder:Array.from({length:np},(_,i)=>(i+ladenStart)%np),
     halfLosers:[null,null],markerHolder:null,finalists:[],
     lastResults:[],lastBest:-1,lastWorst:-1,lastMsg:'',gameLoser:null,
-    kaiserrunde:false,kaiserrundeBy:null,kaiserrundeRound:null,sessionStart:Date.now(),
+    kaiserrunde:false,kaiserrundeBy:null,kaiserTargetRound:0,sessionStart:Date.now(),
     message:'Laden — jeder würfelt einmal, höchste Zahl beginnt!',ts:Date.now()
   };
   await MP.roomRef.update({status:'playing',players,state:JSON.parse(JSON.stringify(G)),spectators:{}});
