@@ -733,6 +733,7 @@ const MP={
       G.kaiserrunde=true;
       G.kaiserrundeBy=req.by||'?';
       G.kaiserTargetRound=G.round+1;
+      G.kaiserReady=false;
       try{this.roomRef.child('kaiserrequest').remove();}catch(e){}
       MP.push();render();
     });
@@ -1079,7 +1080,7 @@ function startGame(names,aiFlags){
     ladenOrder:Array.from({length:NP},(_,i)=>(i+ladenStart)%NP), // randomized order
     halfLosers:[null,null],markerHolder:null,finalists:[],
     lastResults:[],lastBest:-1,lastWorst:-1,lastMsg:'',gameLoser:null,
-    kaiserrunde:false,kaiserrundeBy:null,kaiserTargetRound:0,sessionStart:Date.now(),
+    kaiserrunde:false,kaiserrundeBy:null,kaiserTargetRound:0,kaiserReady:false,sessionStart:Date.now(),
     message:'Laden — jeder würfelt einmal, höchste Zahl beginnt!',ts:Date.now()
   };
   // Biersammler-Stand vorab aus Firebase laden, damit szAutoRecord bei Spielende
@@ -1364,6 +1365,8 @@ function startNextRound(){
 }
 function _doStartNextRound(){
   G.round++;G.phase='rolling';
+  // Kaiserrunde: sobald die Zielrunde gestartet wird, Ready-Flag setzen
+  if(G.kaiserrunde&&G.kaiserTargetRound>0&&G.round>=G.kaiserTargetRound)G.kaiserReady=true;
   let nextFirst=G.lastWorst>=0?G.lastWorst:G.firstInRound;
   const nextParts=getParticipants();
   if(!nextParts.includes(nextFirst)) nextFirst=nextParts[0]||0;
@@ -1973,12 +1976,15 @@ function clickKaiserRunde(){
   G.kaiserrunde=true;
   G.kaiserrundeBy=myName;
   G.kaiserTargetRound=G.round+1; // nächste Runde ist die Kaiserrunde
+  G.kaiserReady=false;
   if(MP.on)MP.push();
   render();
   szToast('\uD83D\uDC51 Kaiserrunde! Noch eine letzte Runde.');
 }
 
 function showKaiserrundeEnd(){
+  // Sicherheits-Guard: nur feuern wenn Host explizit Ready gesetzt hat
+  if(MP.on&&MP.host&&!G?.kaiserReady)return;
   launchConfetti();
   const st=szLoad();
   const stats=szGetStats(st);
@@ -2117,7 +2123,7 @@ else comboEl.textContent=dl; // simple: just show dice values
           G.gameLoser=null;G.halfLosers=[null,null];G.finalists=[];G.half=1;
           G.phase='summary'; // damit _doStartNextRound ungehindert starten kann
         }
-        if(G.round>=G.kaiserTargetRound){showKaiserrundeEnd();}
+        if(G.kaiserReady){showKaiserrundeEnd();}
         else startNextRound();
         return;
       }
@@ -2523,7 +2529,7 @@ async function mpHostStart(){
     ladenOrder:Array.from({length:np},(_,i)=>(i+ladenStart)%np),
     halfLosers:[null,null],markerHolder:null,finalists:[],
     lastResults:[],lastBest:-1,lastWorst:-1,lastMsg:'',gameLoser:null,
-    kaiserrunde:false,kaiserrundeBy:null,kaiserTargetRound:0,sessionStart:Date.now(),
+    kaiserrunde:false,kaiserrundeBy:null,kaiserTargetRound:0,kaiserReady:false,sessionStart:Date.now(),
     message:'Laden — jeder würfelt einmal, höchste Zahl beginnt!',ts:Date.now()
   };
   await MP.roomRef.update({status:'playing',players,state:JSON.parse(JSON.stringify(G)),spectators:{}});
