@@ -444,7 +444,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
 <div id="screen-game">
 <header>
   <div class="logo-row"><img id="ingo-hdr" style="width:36px;height:36px;border-radius:50%;object-fit:cover;object-position:center 25%;border:1.5px solid rgba(212,175,55,.55);" src="" alt="Ingo"><div><div class="logo-ingos">I N G O &apos; S</div><div class="logo-main">SCHOCK DOOF</div></div></div>
-  <div class="hdr-controls"><a id="jitsi-game" href="" target="_blank" rel="noopener" title="Sprachanruf" class="hdr-btn"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.63A2 2 0 012 .82h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg></a><div class="round-chip" id="round-chip">Runde 1</div><div style="font-size:7px;letter-spacing:2px;color:rgba(232,224,208,.18);font-family:Cinzel,serif" id="version-hdr"></div><button onclick="retrySync()" class="hdr-btn">&#x21BB;</button><button onclick="leaveGame()" class="hdr-btn red">&#x2715;</button></div>
+  <div class="hdr-controls"><a id="jitsi-game" href="" target="_blank" rel="noopener" title="Sprachanruf" class="hdr-btn"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.63A2 2 0 012 .82h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg></a><div class="round-chip" id="round-chip">Runde 1</div><div style="font-size:7px;letter-spacing:2px;color:rgba(232,224,208,.18);font-family:Cinzel,serif" id="version-hdr" onclick="_simVersionClick()" title="3x = Spielende sim." style="cursor:pointer;user-select:none"></div><button onclick="retrySync()" class="hdr-btn">&#x21BB;</button><button onclick="leaveGame()" class="hdr-btn red">&#x2715;</button></div>
 </header>
 <div id="spectator-controls"><span>Du schaust zu</span><button onclick="spectatorWantPlay()" id="btn-want-play">KI &uuml;bernehmen &#x2192;</button></div>
 <div class="mitte-section"><div class="mitte-inner"><div><div class="mitte-lbl">MITTE</div><div class="mitte-number" id="mitte-num">13</div></div><div class="lid-dots" id="mitte-dots"></div><div class="mitte-right"><div class="phase-badge" id="phase-badge">1. H&auml;lfte</div></div></div></div>
@@ -1592,6 +1592,24 @@ async function spectatorWantPlay(){
 }
 
 // ── RETRY SYNC ──────────────────────────────────────────────────────
+
+// SIMULATION: 3x auf Versionsnummer klicken = Spielende simulieren
+function simGameOver(){
+  if(!G||!G.players||G.players.length<1){szToast('Kein aktives Spiel');return;}
+  const loserIdx=(G.currentTurn!=null?G.currentTurn:0);
+  G.phase='gameover';G.gameLoser=loserIdx;
+  if(MP.on&&MP.host){G.ts=Date.now();MP.push();}
+  showGameOver();
+}
+let _simClicks=0,_simTimer=null;
+function _simVersionClick(){
+  _simClicks++;
+  clearTimeout(_simTimer);
+  _simTimer=setTimeout(function(){
+    if(_simClicks>=3)simGameOver();
+    _simClicks=0;
+  },600);
+}
 function retrySync(){
   clearTimeout(aiTimer);
   if(!G)return;
@@ -2052,13 +2070,21 @@ function clickKaiserRunde(){
 }
 
 function showKaiserrundeEnd(){
-  // Sicherheits-Guard: nur feuern wenn mindestens 2 komplette Spiele gespielt wurden
   if(MP.on&&MP.host&&(G?.kaiserGamesPlayed||0)<2)return;
+  if(!G||!G.players){console.error('showKaiserrundeEnd: G fehlt');return;}
+  try{_doShowKaiserrundeEnd();}catch(err){
+    console.error('Kaiser-End-Fehler:',err);
+    const kc=document.getElementById('kaiser-content');
+    if(kc)kc.innerHTML='<p style="color:#e74c3c">Ladefehler: '+err.message+'</p>';
+    closeModal('modal-summary');closeModal('modal-halfend');openModal('modal-kaiser');
+  }
+}
+function _doShowKaiserrundeEnd(){
   launchConfetti();
   const st=szLoad();
   const stats=szGetStats(st);
   const sessionStart=G.sessionStart||0;
-  const allHumans=G.players.filter(p=>p&&!p.isAI).map(p=>p.name);
+  const allHumans=(G.players||[]).filter(p=>p&&!p.isAI).map(p=>p.name);
 
   // Spiele dieser Sitzung
   const sessionGames=st.games.filter(g=>g.ts>=sessionStart);
@@ -2112,8 +2138,10 @@ function showKaiserrundeEnd(){
   }
   html+='</table>';
 
-  document.getElementById('kaiser-content').innerHTML=html;
-  document.getElementById('btn-kaiser-done').onclick=()=>{
+  const _kc=document.getElementById('kaiser-content');
+  if(_kc)_kc.innerHTML=html;
+  const _kbd=document.getElementById('btn-kaiser-done');
+  if(_kbd)_kbd.onclick=()=>{
     closeModal('modal-kaiser');
     if(MP.on){try{MP.roomRef.child('kaiserrequest').remove();}catch(e){}}
     MP.stop();G=null;
