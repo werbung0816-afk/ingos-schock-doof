@@ -1560,7 +1560,7 @@ function revealThenSummary(){
 
 async function leaveGame(){
   _stopStuckMonitor();
-  if(!confirm('Spiel verlassen?'))return;
+  // confirm() entfernt — direkt fortfahren
   if(MP.spectator){
     // Zuschauer verlässt: aus Firebase entfernen
     if(MP._specRef)try{await MP._specRef.remove();}catch(e){}
@@ -2115,20 +2115,20 @@ function _doShowKaiserrundeEnd(){
   html+='<table style="width:100%;border-collapse:collapse">';
   // show all known players; filter to those with open debts or playing now
   const relevant=st.players.filter(n=>{
-    const settled=st.settled[n]||0;
+    const settled=(st.settled||{})[n]||0;
     const open=Math.max(0,(stats[n]||0)-settled);
     return open>0||allHumans.includes(n);
   });
   relevant.sort((a,b)=>{
-    const oa=Math.max(0,(stats[a]||0)-(st.settled[a]||0));
-    const ob=Math.max(0,(stats[b]||0)-(st.settled[b]||0));
+    const oa=Math.max(0,(stats[a]||0)-((st.settled||{})[a]||0));
+    const ob=Math.max(0,(stats[b]||0)-((st.settled||{})[b]||0));
     return ob-oa;
   });
   if(relevant.length===0){
     html+='<tr><td colspan="2" style="font-size:12px;color:rgba(232,224,208,.4);padding:4px 0">Noch keine Einträge</td></tr>';
   } else {
     relevant.forEach(n=>{
-      const settled=st.settled[n]||0;
+      const settled=(st.settled||{})[n]||0;
       const open=Math.max(0,(stats[n]||0)-settled);
       const eur=(open*SZ_RATE).toFixed(2).replace('.',',');
       html+=`<tr><td style="text-align:left;padding:3px 2px;font-size:13px">${escHtml(n)}</td>`
@@ -2406,9 +2406,9 @@ async function resetRoom(){
   const snap=await db.ref('rooms/sd_1895').once('value');
   const room=snap.val();
   if(room&&room.hostName&&room.hostName!==name){
-    alert('Nur der Admin ('+room.hostName+') kann den Raum zurücksetzen.');return;
+    szToast('Nur der Admin ('+room.hostName+') kann den Raum zurücksetzen.');return;
   }
-  if(!confirm('Raum 1895 komplett löschen und neu starten?'))return;
+  // confirm() entfernt — Raum wird direkt zurückgesetzt
   try{
     await db.ref('rooms/sd_1895').remove();
     const badge=document.getElementById('room-status-badge');
@@ -2651,8 +2651,9 @@ var _szState=null;
 var _szRef=null;
 function szGetRef(){if(!_szRef){try{_szRef=getDB().ref('biersammler');}catch(e){}}return _szRef;}
 function szLoad(){
-  if(_szState)return JSON.parse(JSON.stringify(_szState));
-  try{var d=localStorage.getItem('sd_schulden');if(d){var p=JSON.parse(d);_szState=p;return JSON.parse(JSON.stringify(p));}}catch(e){}
+  function _norm(s){if(s&&!s.settled)s.settled={};return s;}
+  if(_szState)return JSON.parse(JSON.stringify(_norm(_szState)));
+  try{var d=localStorage.getItem('sd_schulden');if(d){var p=JSON.parse(d);_szState=_norm(p);return JSON.parse(JSON.stringify(_szState));}}catch(e){}
   return{players:['Ingo'],settled:{},games:[]};
 }
 function szSave(st){
@@ -2666,6 +2667,7 @@ function szSyncFromFirebase(){
   ref.once('value',function(snap){
     var data=snap.val();
     if(data&&typeof data==='object'){
+      if(!data.settled)data.settled={};
       _szState=data;
       try{localStorage.setItem('sd_schulden',JSON.stringify(data));}catch(e){}
       szRender();
@@ -2675,7 +2677,7 @@ function szSyncFromFirebase(){
 function szInitials(n){return (n||'?').split(' ').map(function(w){return w[0]||'';}).join('').toUpperCase().slice(0,2)||'?';}
 function szColor(name,players){var i=players.indexOf(name);return SZ_COLORS[i>=0?i%SZ_COLORS.length:0];}
 function szFmtDate(ts){var d=new Date(ts);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});}
-function szGetStats(st){
+function szGetStats(st){if(!st)return{};if(!st.settled)st.settled={};
   var c={};
   st.players.forEach(function(p){c[p]=0;});
   st.games.forEach(function(g){
@@ -2703,7 +2705,7 @@ function szRender(){
     var name=entry[0];var count=entry[1];
     var col=szColor(name,st.players);var cb=col.replace('.8)','.18)');
     var pct=mx>0?Math.round(count/mx*100):0;
-    var open=Math.max(0,count-(st.settled[name]||0));
+    var open=Math.max(0,count-((st.settled||{})[name]||0));
     var oe=(open*SZ_RATE).toFixed(2).replace('.',',');
     var isTop=i===0&&count>0;
     var tr=document.createElement('tr');
@@ -2758,7 +2760,8 @@ function szMarkSettled(){
   var sorted=Object.entries(counts).sort(function(a,b){return b[1]-a[1];});
   var top=null;for(var i=0;i<sorted.length;i++){if(sorted[i][1]>0){top=sorted[i];break;}}
   if(!top)return;
-  var name=top[0];var count=top[1];var cur=st.settled[name]||0;
+  var name=top[0];var count=top[1];if(!st.settled)st.settled={};
+  var cur=st.settled[name]||0;
   st.settled[name]=cur<count?count:0;szSave(st);szRender();
   szToast(cur<count?name+' \u2014 beglichen':name+' \u2014 zur\u00fcckgesetzt');
 }
