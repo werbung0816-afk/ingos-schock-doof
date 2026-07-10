@@ -393,7 +393,7 @@ body{-webkit-user-select:none;user-select:none}
    Ein fester Raum. Erster Spieler = Host (Spiel-Engine). Gäste sehen den
    Zustand und senden auf ihrem Zug Signale; der Host wendet sie an.
    ============================================================ */
-const VERSION='v5.62';
+const VERSION='v5.64';
 const P_COLORS=['#ffd400','#53f6ff','#e2231a','#39d98a'];
 function playerColor(i){ return P_COLORS[i%P_COLORS.length]; }
 const TOTAL_LIDS=13;
@@ -766,7 +766,21 @@ function aiKeep(idx){ const ps=G.playerStates[idx]; const c=[0,0,0,0,0,0,0]; ps.
   let hi=0,hii=0; ps.dice.forEach((d,i)=>{ if(d>hi){hi=d;hii=i;} }); if(hi>=5)ps.kept[hii]=true; }
 
 /* ---------- Runde auswerten (Host) ---------- */
-function giveLids(toIdx,amount,fromIdx){ for(let k=0;k<amount;k++){ if(G.middleLids>0)G.middleLids--; else break; /* Mitte leer → keine Deckel vom Gewinner nehmen */ G.players[toIdx].lids++; if(G.players[toIdx].lids>=TOTAL_LIDS){G.players[toIdx].lids=TOTAL_LIDS;break;} } }
+function giveLids(toIdx,amount,fromIdx){
+  if(G.middleLids>0){
+    // Mitte hat noch Deckel → nur aus der Mitte, gedeckelt auf Vorrat
+    const take=Math.min(amount,G.middleLids);
+    G.middleLids-=take;
+    G.players[toIdx].lids=Math.min(G.players[toIdx].lids+take,TOTAL_LIDS);
+  } else {
+    // Mitte bereits leer → vom Gewinner (activePlayers filtert schon, dass nur Spieler mit Deckeln mitspielen)
+    for(let k=0;k<amount;k++){
+      if(G.players[fromIdx]&&G.players[fromIdx].lids>0){ G.players[fromIdx].lids--; } else break;
+      G.players[toIdx].lids++;
+      if(G.players[toIdx].lids>=TOTAL_LIDS){G.players[toIdx].lids=TOTAL_LIDS;break;}
+    }
+  }
+}
 function resolveRound(){
   G.phase='summary'; const ids=G.turnOrder.slice();
   ids.forEach(i=>{ const ps=G.playerStates[i]; if(!ps.combo)ps.combo=evalDice(ps.dice,ps.throwNum||1); ps.concealed=false; });
