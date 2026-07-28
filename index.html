@@ -393,7 +393,7 @@ body{-webkit-user-select:none;user-select:none}
    Ein fester Raum. Erster Spieler = Host (Spiel-Engine). Gäste sehen den
    Zustand und senden auf ihrem Zug Signale; der Host wendet sie an.
    ============================================================ */
-const VERSION='v5.64';
+const VERSION='v5.65';
 const P_COLORS=['#ffd400','#53f6ff','#e2231a','#39d98a'];
 function playerColor(i){ return P_COLORS[i%P_COLORS.length]; }
 const TOTAL_LIDS=13;
@@ -479,6 +479,19 @@ function playChain(list){
 /* ---------- Helpers ---------- */
 function vibe(p){ try{ if('vibrate' in navigator) navigator.vibrate(p); }catch(e){} }
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+// Abbrechbare Sleep-Variante nur für animRoll:
+// bei App-Wechsel sofort auflösen statt minutenlang warten
+const _animTimers=new Map();
+function animSleep(ms){
+  return new Promise(r=>{
+    const t=setTimeout(()=>{ _animTimers.delete(t); r(); },ms);
+    _animTimers.set(t,r);
+  });
+}
+function abortAnimSleeps(){
+  _animTimers.forEach((resolve,t)=>{ clearTimeout(t); resolve(); });
+  _animTimers.clear();
+}
 function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
 function toast(msg,type){ /* Hinweis-Popups deaktiviert */ }
 function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on')); $(id).classList.add('on'); curScreen=id; if(typeof _syncDevBtn==='function')_syncDevBtn(); }
@@ -700,8 +713,8 @@ async function animRoll(idx){
   $('cup').classList.add('shake'); playDice(); G.soundCue={type:'dice',ts:Date.now()}; vibe([10,30,10]);
   if(me){ $('dice').innerHTML=ps.dice.map((d,i)=>`<div class="die${ps.kept[i]?' kept':''}" data-i="${i}">${pips(d)}</div>`).join('');
     const els=[...$('dice').children]; els.forEach((el,i)=>{ if(!ps.kept[i]) el.classList.add('roll'); });
-    for(let f=0;f<5;f++){ if(document.hidden)break; els.forEach((el)=>{ const i=Number(el.dataset.i); if(!ps.kept[i]) el.innerHTML=pips(rollDie()); }); await sleep(70); } }
-  else { if(!document.hidden) await sleep(420); }
+    for(let f=0;f<5;f++){ els.forEach((el)=>{ const i=Number(el.dataset.i); if(!ps.kept[i]) el.innerHTML=pips(rollDie()); }); await animSleep(70); } }
+  else { await animSleep(420); }
   for(let i=0;i<3;i++){ if(!ps.kept[i]) ps.dice[i]=rollDie(); }
   ps.throwNum++; ps.mustRoll=false; $('cup').classList.remove('shake'); renderDice(); $('thr').textContent=`Wurf ${ps.throwNum} / ${curMax()}`;
 }
@@ -946,7 +959,7 @@ function advanceStuck(){
 function startRecovery(){ stopRecovery();
   recoveryTimer=setInterval(()=>{ if(!G)return;
     // _rolling-Hänger beheben (auf jedem Gerät)
-    if(_rolling){ _rolling=false; if(G.phase==='rolling'){ try{renderTurnUI();renderDice();}catch(e){} } }
+    if(_rolling){ abortAnimSleeps(); _rolling=false; if(G.phase==='rolling'){ try{renderTurnUI();renderDice();}catch(e){} } }
     if(!amHost)return;
     const age=Date.now()-(G.ts||0);
     if((G.phase==='summary'||G.phase==='notice'||G.phase==='gameover'||G.phase==='kaiserover')&&age>5000) advanceStuck();
@@ -1104,7 +1117,7 @@ $('leaveRoomBtn').addEventListener('click',leaveRoom);
 
 $('homeBtn').addEventListener('click',()=>{ if(ONLINE){ leaveRoom(); } else { showScreen('lobby'); } });
 $('resyncBtn').addEventListener('click',()=>{
-  _rolling=false; // stuck-roll immer zuerst freigeben
+  abortAnimSleeps(); _rolling=false; // stuck-roll immer zuerst freigeben
   if(!G){ toast('Kein Spiel aktiv.',''); return; }
   if(!amHost){
     // Gast: State frisch von Firebase laden
@@ -1146,8 +1159,8 @@ const _kt=$('kaiserToggle'); if(_kt) _kt.addEventListener('click',()=>{
 // ── Stabilisierung nach App-Wechsel ──────────────────────────────────────────
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState!=='visible') return;
-  // 1) _rolling-Lock sofort freigeben (war vielleicht mitten in animRoll)
-  _rolling=false;
+  // 1) Animationssleeps sofort auflösen → animRoll beendet sich, hostRoll setzt _rolling=false
+  abortAnimSleeps();
   // 2) Firebase-Verbindung neu aufwecken
   try{ if(ONLINE && firebase && firebase.database) firebase.database().goOnline(); }catch(e){}
   // 3) AudioContext reaktivieren (iOS/Android frieren ihn ein)
