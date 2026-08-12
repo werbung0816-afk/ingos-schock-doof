@@ -450,16 +450,16 @@ function fitCupName(el,name){
   // Tally-Striche direkt unter dem Namen einbauen
   var _n=(SZ&&SZ.settled&&SZ.settled[name])||0;
   if(_n>0){
-    var _col='rgba(255,220,130,.52)',_sw=.8;
+    var _col='rgba(255,220,130,.52)',_sw=.75;
     function _vl(x1,y1,x2,y2){ return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+_col+'" stroke-width="'+_sw+'" stroke-linecap="round"/>'; }
-    function _m5(g){ var s='<svg width="16" height="9" viewBox="0 0 16 9" style="display:inline-block">';
-      [[1.7,.7,1.5,8.3],[4.5,.3,4.3,8.7],[7.3,.6,7.1,8.4],[10.1,.2,10.3,8.8]].forEach(function(v,i){
-        var d=(g+i)%3===0?.13:(g+i)%3===1?-.09:.06; s+=_vl(v[0]+d,v[1],v[2]-d*.5,v[3]);});
-      s+=_vl(.3,8.2,14.7,1.1); return s+'</svg>'; }
-    function _mn(n2,g){ var w=n2*3+2,s='<svg width="'+w+'" height="9" viewBox="0 0 '+w+' 9" style="display:inline-block">';
-      for(var i=0;i<n2;i++){var xb=1.6+i*3,d=(g*3+i)%3===0?.13:(g*3+i)%3===1?-.09:.06;
-        s+=_vl(xb+d,i%2?.3:.7,xb-d*.5,i%2?8.7:8.3);} return s+'</svg>'; }
-    var _gr=Math.floor(_n/5),_rm=_n%5,_th='<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:1px;margin-top:1px">';
+    function _m5(g){ var s='<svg width="11" height="8" viewBox="0 0 11 8" style="display:inline-block;vertical-align:top">';
+      [[1.1,.5,1.0,7.5],[3.0,.2,2.9,7.8],[5.0,.5,4.9,7.5],[6.9,.2,7.0,7.8]].forEach(function(v,i){
+        var d=(g+i)%3===0?.1:(g+i)%3===1?-.07:.05; s+=_vl(v[0]+d,v[1],v[2]-d*.4,v[3]);});
+      s+=_vl(.2,7.2,10.1,.8); return s+'</svg>'; }
+    function _mn(n2,g){ var w=n2*2.2+1.5,s='<svg width="'+w+'" height="8" viewBox="0 0 '+w+' 8" style="display:inline-block;vertical-align:top">';
+      for(var i=0;i<n2;i++){var xb=1.0+i*2.2,d=(g*3+i)%3===0?.1:(g*3+i)%3===1?-.07:.05;
+        s+=_vl(xb+d,i%2?.2:.5,xb-d*.4,i%2?7.8:7.5);} return s+'</svg>'; }
+    var _gr=Math.floor(_n/5),_rm=_n%5,_th='<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:.5px;margin-top:1px;max-width:100%;line-height:0;max-height:27px;overflow:hidden">';
     for(var _g=0;_g<_gr;_g++) _th+=_m5(_g);
     if(_rm>0) _th+=_mn(_rm,_gr);
     _th+='</div>';
