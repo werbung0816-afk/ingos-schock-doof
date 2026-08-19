@@ -442,7 +442,7 @@ body{-webkit-user-select:none;user-select:none}
    Ein fester Raum. Erster Spieler = Host (Spiel-Engine). Gäste sehen den
    Zustand und senden auf ihrem Zug Signale; der Host wendet sie an.
    ============================================================ */
-const VERSION='v5.92';
+const VERSION='v5.93';
 const P_COLORS=['#ffd400','#53f6ff','#e2231a','#39d98a'];
 function playerColor(i){ return P_COLORS[i%P_COLORS.length]; }
 const TOTAL_LIDS=13;
@@ -667,7 +667,13 @@ function enterRoom(){
       if(!amSpectator&&_activePhase&&!_confirmedPlayer){
         // Echter Zuschauer: CID war noch nie in der Spielerliste
         enterSpectatorMode();
-        G=hydrate(raw); if(curScreen!=='game') showScreen('game'); paint(); return;
+        const _prevTN=(G&&!amHost&&G.phase==='rolling'&&G.turnOrder)?((G.playerStates[cur()]||{}).throwNum||0):-1;
+    G=hydrate(raw); if(curScreen!=='game') showScreen('game');
+    if(!amHost&&G.phase==='rolling'&&G.turnOrder&&G.turnOrder.length>0){
+      const _newTN=(G.playerStates[cur()]||{}).throwNum||0;
+      if(_newTN>_prevTN&&_newTN>0){ guestDiceAnim().then(()=>{ renderDice(); }); }
+    }
+    paint(); return;
       }
       if(!amSpectator) return; // Warte-Zustand: noch kein Spiel für diesen Spieler
     }
@@ -682,7 +688,13 @@ function enterRoom(){
     // Sound nachholen: alle Klick-/Würfel-/Fanfaren-Sounds laufen Host-seitig in Funktionen,
     // die auf Gast-Geräten nie ausgeführt werden — daher hier per Cue manuell triggern.
     if(raw.soundCue&&raw.soundCue.ts&&raw.soundCue.ts>_lastCueTs){ _lastCueTs=raw.soundCue.ts; playSoundCue(raw.soundCue); }
-    G=hydrate(raw); if(curScreen!=='game') showScreen('game'); paint();
+    const _prevTN=(G&&!amHost&&G.phase==='rolling'&&G.turnOrder)?((G.playerStates[cur()]||{}).throwNum||0):-1;
+    G=hydrate(raw); if(curScreen!=='game') showScreen('game');
+    if(!amHost&&G.phase==='rolling'&&G.turnOrder&&G.turnOrder.length>0){
+      const _newTN=(G.playerStates[cur()]||{}).throwNum||0;
+      if(_newTN>_prevTN&&_newTN>0){ guestDiceAnim().then(()=>{ renderDice(); }); }
+    }
+    paint();
   });
   // Zuschauer: Toast wenn jemand zuschauen beginnt
   ROOM.child('spectatorJoin').on('value',s=>{
@@ -1422,6 +1434,27 @@ function clickJoinNext(){
   if(ONLINE) try{ ROOM.child('viewers').child(myName.replace(/[.#$\[\]]/g,'_')).set({name:myName,ts:Date.now()}); }catch(e){}
   toast('Du spielst ab dem nächsten Spiel mit!','ok');
   const btn=document.getElementById('joinNextBtn'); if(btn){ btn.textContent='✓ Angemeldet'; btn.disabled=true; }
+}
+
+// Lokale Würfelanimation für Gäste beim Empfang neuer Würfelergebnisse
+function guestDiceAnim(){
+  const idx=cur(), ps=G.playerStates[idx];
+  if(!ps||ps.throwNum===0) return Promise.resolve();
+  $('cup').classList.add('shake');
+  const dEl=$('dice');
+  // Zeige tumbling dice: behalte kept-Würfel, animiere den Rest
+  dEl.innerHTML=ps.dice.map((d,i)=>`<div class="die${ps.kept[i]?' kept':''}">${ps.kept[i]?pips(d):''}</div>`).join('');
+  const els=[...dEl.children];
+  let frame=0;
+  return new Promise(resolve=>{
+    function step(){
+      if(frame>=4){ $('cup').classList.remove('shake'); resolve(); return; }
+      els.forEach((el,i)=>{ if(!ps.kept[i]) el.innerHTML=pips(rollDie()); el.classList.add('roll'); });
+      frame++;
+      setTimeout(step,70);
+    }
+    step();
+  });
 }
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
