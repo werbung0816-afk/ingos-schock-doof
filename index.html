@@ -425,6 +425,7 @@ body{-webkit-user-select:none;user-select:none}
 
     <div class="foot" style="display:flex;align-items:center;justify-content:center;gap:12px;opacity:.65">
       <span id="kaiserToggle" class="kaiser-toggle" style="cursor:pointer"><span id="kaiserBox" style="width:13px;height:13px;border-radius:3px;border:1.5px solid rgba(255,207,92,.5);display:inline-grid;place-items:center;font-size:.6rem"></span> 👑 Kaiserrunde</span>
+      <span id="sessScore" style="display:none;align-items:center;padding:4px 8px;border-radius:9px;font-size:.73rem;font-weight:600;color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07)"></span>
       <span id="bierBtnGame" style="display:inline-flex;align-items:center;gap:.3rem;padding:4px 8px;border-radius:9px;font-size:.73rem;font-weight:600;color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);cursor:pointer">🍺 Biersammler</span>
     </div>
   <div id="spectatorBar"><span class="spec-lbl">👁 Du schaust zu</span><button class="spec-btn" id="joinNextBtn">Beim nächsten Spiel mitspielen</button></div>
@@ -442,7 +443,7 @@ body{-webkit-user-select:none;user-select:none}
    Ein fester Raum. Erster Spieler = Host (Spiel-Engine). Gäste sehen den
    Zustand und senden auf ihrem Zug Signale; der Host wendet sie an.
    ============================================================ */
-const VERSION='v5.93';
+const VERSION='v5.94';
 const P_COLORS=['#ffd400','#53f6ff','#e2231a','#39d98a'];
 function playerColor(i){ return P_COLORS[i%P_COLORS.length]; }
 const TOTAL_LIDS=13;
@@ -513,6 +514,7 @@ let roomPlayersLocal=[];      // nur für Offline-Test
 let curScreen='lobby';
 
 document.querySelectorAll('.footVer').forEach(e=>e.textContent=VERSION);
+renderSessScore();
 try{ const n=localStorage.getItem('schock_name'); if(n) $('nameInput').value=n; }catch(e){}
 (function(){const el=document.getElementById('intro');if(!el)return;const fade=()=>{el.style.transition='opacity .35s';el.style.opacity='0';setTimeout(()=>el.remove(),360);};setTimeout(fade,2500);el.addEventListener('click',fade);})();
 
@@ -964,8 +966,11 @@ function onGameComplete(loserIdx,extra,isDoubleLoss){
   if(G.kaiserrunde){ G.kaiserGamesPlayed++; if(G.kaiserGamesPlayed===1)kind='handoff'; else if(G.kaiserGamesPlayed>=2)kind='final'; }
   G.phase=(kind==='final')?'kaiserover':'gameover';
   const winnerIdx=G.players.reduce((best,_,i)=>i!==loserIdx&&!G.players[i].isAI?i:best,-1);
+  if(winnerIdx>=0&&!G.players[winnerIdx].isAI) addSessWin(G.players[winnerIdx].name);
   const winLine=(kind==='final')?'👑 KAISERRUNDE VORBEI!':(isDoubleLoss?pick(DOUBLE_LOSS_LINES):pick(LOSER_LINES));
   G.over={loser:loserIdx,winner:winnerIdx>=0?winnerIdx:null,extra:extra||'',kind,comment:winLine,showBier};
+  const _ss=_getSess().scores; const _se=Object.entries(_ss).sort((a,b)=>b[1]-a[1]);
+  if(_se.length>1) setTimeout(()=>toast('📊 Spielstand: '+_se.map(([n,v])=>n.split(' ')[0]+' '+v).join(' : '),'ok'),2200);
   _gameOverConfirmed=true;
   vibe([60,40,60,40,120]); confetti();
   G.soundCue={type:isDoubleLoss?'doubleloss':(kind==='final'?'kaiserover':'gameover'),ts:Date.now()};
@@ -1319,8 +1324,8 @@ document.addEventListener('visibilitychange',()=>{
 
 // Chat
 var _lastChatTs=0,_chatHideTimer=null;
-var CHAT_QUICK=['Prost! \u{1F37B}','Schock Doof! \u{1F631}','Zum Wohl! \u{1F942}','Gl\u00FCck gehabt \u{1F605}','Nochmal! \u{1F3B2}','Nicht schlecht \u{1F440}','H\u00E4?? \u{1F914}','Is klar! \u{1F44C}','Interessant! \u{1F9D0}','Letzte Runde! \u{1F514}','Gute Nacht! \u{1F634}'];
-var CHAT_EMOJI=['\u{1F602}','\u{1F605}','\u{1F631}','\u{1F926}','\u{1F937}','\u{1F634}','\u{1F480}','\u{1F37A}','\u{1F37B}','\u{1F942}','\u{1F389}','\u{1F525}','\u{1F4AA}','\u{1F44D}','\u{1F44E}','\u{1F3B2}','\u{1F3C6}','\u{1F608}','\u{1FAE0}','\u{1F973}','\u{1F929}','\u{1F62D}'];
+var CHAT_QUICK=['Prost! \u{1F37B}','Schock Doof! \u{1F631}','Zum Wohl! \u{1F942}','Gl\u00FCck gehabt \u{1F605}','Nochmal! \u{1F3B2}','Nicht schlecht \u{1F440}','H\u00E4?? \u{1F914}','Is klar! \u{1F44C}','Interessant! \u{1F9D0}','Letzte Runde! \u{1F514}','Gute Nacht! \u{1F634}','Du Schlawiner! \u{1F608}','Da ist mein Straßenkünstler! \u{1F3A8}','Natürlich! \u{1F60C}','Da geht noch was! \u{1F4AA}','Mein Schock wird höher! \u{1F3B2}','Beförderung zum General! \u{1F3C6}','Das ist nicht normal! \u{1F631}','Ein schöner Tag! \u{2600}','Heute ist Dein Tag! \u{1F389}',"Gibt\'s doch nicht! \u{1F92F}",'Bäähmmm!!! \u{1F4A5}'];
+var CHAT_EMOJI=['\u{1F602}','\u{1F605}','\u{1F631}','\u{1F926}','\u{1F937}','\u{1F634}','\u{1F480}','\u{1F37A}','\u{1F37B}','\u{1F942}','\u{1F389}','\u{1F525}','\u{1F4AA}','\u{1F44D}','\u{1F44E}','\u{1F3B2}','\u{1F3C6}','\u{1F608}','\u{1FAE0}','\u{1F973}','\u{1F929}','\u{1F62D}','\u{1F92E}','\u{1FAF6}','\u{1F633}','\u{1F4A9}','\u{1F44F}','\u{1F484}','\u{2764}','\u{1F44B}'];
 
 function sendChat(text){
   if(!text||!text.trim()) return;
@@ -1455,6 +1460,29 @@ function guestDiceAnim(){
     }
     step();
   });
+}
+
+// Tageszähler (Session-Score)
+const _SESS_KEY='sd_sess_score';
+function _getSess(){
+  try{ const d=JSON.parse(localStorage.getItem(_SESS_KEY)||'null');
+    const today=new Date().toISOString().slice(0,10);
+    if(d&&d.date===today) return d;
+    return {date:today,scores:{}}; }catch(e){ return {date:'',scores:{}}; }
+}
+function addSessWin(name){
+  if(!name||isTestName(name)) return;
+  const d=_getSess(); d.scores[name]=(d.scores[name]||0)+1;
+  try{ localStorage.setItem(_SESS_KEY,JSON.stringify(d)); }catch(e){}
+  renderSessScore();
+}
+function renderSessScore(){
+  const el=document.getElementById('sessScore'); if(!el) return;
+  const scores=_getSess().scores;
+  const entries=Object.entries(scores).filter(([n])=>n).sort((a,b)=>b[1]-a[1]);
+  if(entries.length===0){ el.style.display='none'; return; }
+  el.style.display='inline-flex';
+  el.textContent='📊 '+entries.map(([n,v])=>n.split(' ')[0]+' '+v).join(' : ');
 }
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
