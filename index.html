@@ -293,6 +293,8 @@ body{-webkit-user-select:none;user-select:none}
 .chat-bubble{background:rgba(15,5,45,.85);backdrop-filter:blur(10px);border:1px solid rgba(255,212,0,.32);border-radius:18px;padding:9px 18px;display:inline-block;max-width:100%;box-shadow:0 4px 24px rgba(0,0,0,.5)}
 .chat-sender{font-size:.68rem;font-weight:700;color:var(--gold);letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:3px}
 .chat-text{font-size:.98rem;font-weight:700;color:#fff;word-break:break-word;display:block}
+.chat-score{font-size:1.1rem;font-weight:800;color:#fff;display:block;margin-bottom:2px}
+.chat-comment{font-size:.88rem;font-weight:400;color:rgba(255,255,255,.8);display:block}
 #chatModal{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);align-items:flex-end;justify-content:center}
 #chatModal.on{display:flex}
 .chat-sheet{background:linear-gradient(170deg,#0e1f60,#07000f);border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:80vh;overflow-y:auto;padding:14px 16px 32px;border-top:1px solid rgba(255,255,255,.13);display:flex;flex-direction:column;gap:10px;box-sizing:border-box}
@@ -425,7 +427,6 @@ body{-webkit-user-select:none;user-select:none}
 
     <div class="foot" style="display:flex;align-items:center;justify-content:center;gap:12px;opacity:.65">
       <span id="kaiserToggle" class="kaiser-toggle" style="cursor:pointer"><span id="kaiserBox" style="width:13px;height:13px;border-radius:3px;border:1.5px solid rgba(255,207,92,.5);display:inline-grid;place-items:center;font-size:.6rem"></span> 👑 Kaiserrunde</span>
-      <span id="sessScore" style="display:none;align-items:center;padding:4px 8px;border-radius:9px;font-size:.73rem;font-weight:600;color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07)"></span>
       <span id="bierBtnGame" style="display:inline-flex;align-items:center;gap:.3rem;padding:4px 8px;border-radius:9px;font-size:.73rem;font-weight:600;color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);cursor:pointer">🍺 Biersammler</span>
     </div>
   <div id="spectatorBar"><span class="spec-lbl">👁 Du schaust zu</span><button class="spec-btn" id="joinNextBtn">Beim nächsten Spiel mitspielen</button></div>
@@ -443,7 +444,7 @@ body{-webkit-user-select:none;user-select:none}
    Ein fester Raum. Erster Spieler = Host (Spiel-Engine). Gäste sehen den
    Zustand und senden auf ihrem Zug Signale; der Host wendet sie an.
    ============================================================ */
-const VERSION='v5.94';
+const VERSION='v5.95';
 const P_COLORS=['#ffd400','#53f6ff','#e2231a','#39d98a'];
 function playerColor(i){ return P_COLORS[i%P_COLORS.length]; }
 const TOTAL_LIDS=13;
@@ -514,7 +515,6 @@ let roomPlayersLocal=[];      // nur für Offline-Test
 let curScreen='lobby';
 
 document.querySelectorAll('.footVer').forEach(e=>e.textContent=VERSION);
-renderSessScore();
 try{ const n=localStorage.getItem('schock_name'); if(n) $('nameInput').value=n; }catch(e){}
 (function(){const el=document.getElementById('intro');if(!el)return;const fade=()=>{el.style.transition='opacity .35s';el.style.opacity='0';setTimeout(()=>el.remove(),360);};setTimeout(fade,2500);el.addEventListener('click',fade);})();
 
@@ -966,11 +966,12 @@ function onGameComplete(loserIdx,extra,isDoubleLoss){
   if(G.kaiserrunde){ G.kaiserGamesPlayed++; if(G.kaiserGamesPlayed===1)kind='handoff'; else if(G.kaiserGamesPlayed>=2)kind='final'; }
   G.phase=(kind==='final')?'kaiserover':'gameover';
   const winnerIdx=G.players.reduce((best,_,i)=>i!==loserIdx&&!G.players[i].isAI?i:best,-1);
-  if(winnerIdx>=0&&!G.players[winnerIdx].isAI) addSessWin(G.players[winnerIdx].name);
+  if(winnerIdx>=0&&!isTestName(G.players[winnerIdx].name)) addSessWin(G.players[winnerIdx].name);
   const winLine=(kind==='final')?'👑 KAISERRUNDE VORBEI!':(isDoubleLoss?pick(DOUBLE_LOSS_LINES):pick(LOSER_LINES));
   G.over={loser:loserIdx,winner:winnerIdx>=0?winnerIdx:null,extra:extra||'',kind,comment:winLine,showBier};
-  const _ss=_getSess().scores; const _se=Object.entries(_ss).sort((a,b)=>b[1]-a[1]);
-  if(_se.length>1) setTimeout(()=>toast('📊 Spielstand: '+_se.map(([n,v])=>n.split(' ')[0]+' '+v).join(' : '),'ok'),2200);
+  const _sp=G.players.filter(p=>!isTestName(p.name)).map(p=>p.name);
+  const _ingoP=G.players.some(p=>p.name==='Ingo'&&p.isAI);
+  if(_sp.length>=2) setTimeout(function(){ showIngoScore(_sp,_ingoP); },6000);
   _gameOverConfirmed=true;
   vibe([60,40,60,40,120]); confetti();
   G.soundCue={type:isDoubleLoss?'doubleloss':(kind==='final'?'kaiserover':'gameover'),ts:Date.now()};
@@ -1338,7 +1339,17 @@ function sendChat(text){
 function showChatMsg(sender,text){
   var el=document.getElementById('chatMsg'); if(!el) return;
   clearTimeout(_chatHideTimer);
-  el.innerHTML='<div class="chat-bubble"><span class="chat-sender">\u{1F4AC} '+sender+'</span><span class="chat-text">'+text+'</span></div>';
+  var _parts=text.split('\n');
+  var _inner;
+  if(_parts.length>=2){
+    _inner='<span class="chat-sender">\u{1F4AC} '+sender+'</span>'
+          +'<span class="chat-score">'+_parts[0]+'</span>'
+          +'<span class="chat-comment">'+_parts.slice(1).join(' ')+'</span>';
+  } else {
+    _inner='<span class="chat-sender">\u{1F4AC} '+sender+'</span>'
+          +'<span class="chat-text">'+text+'</span>';
+  }
+  el.innerHTML='<div class="chat-bubble">'+_inner+'</div>';
   el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
   _chatHideTimer=setTimeout(function(){ el.classList.remove('on'); },5300);
 }
@@ -1474,15 +1485,51 @@ function addSessWin(name){
   if(!name||isTestName(name)) return;
   const d=_getSess(); d.scores[name]=(d.scores[name]||0)+1;
   try{ localStorage.setItem(_SESS_KEY,JSON.stringify(d)); }catch(e){}
-  renderSessScore();
 }
-function renderSessScore(){
-  const el=document.getElementById('sessScore'); if(!el) return;
-  const scores=_getSess().scores;
-  const entries=Object.entries(scores).filter(([n])=>n).sort((a,b)=>b[1]-a[1]);
-  if(entries.length===0){ el.style.display='none'; return; }
-  el.style.display='inline-flex';
-  el.textContent='📊 '+entries.map(([n,v])=>n.split(' ')[0]+' '+v).join(' : ');
+
+
+// Ingo Score-Kommentare
+var _INGO_USED='sd_ingo_used';
+function _getUsed(){
+  try{ var d=JSON.parse(localStorage.getItem(_INGO_USED)||'null');
+    var t=new Date().toISOString().slice(0,10);
+    if(d&&d.date===t) return d.used||[]; return []; }catch(e){ return []; }
+}
+function _markUsed(id){
+  try{ var t=new Date().toISOString().slice(0,10),u=_getUsed(); u.push(id);
+    localStorage.setItem(_INGO_USED,JSON.stringify({date:t,used:u})); }catch(e){}
+}
+function _pickC(pool){
+  var used=_getUsed(), av=pool.filter(function(x){ return used.indexOf(x.i)<0; });
+  if(!av.length) return null;
+  var p=av[Math.floor(Math.random()*av.length)]; _markUsed(p.i); return p.t;
+}
+var _IC={
+  p1:[
+    {w:[{i:'p1w1',t:'Anfängerglück. 🙄'},{i:'p1w2',t:'Das zählt nicht. Ich war abgelenkt.'},{i:'p1w3',t:'Beim nächsten Mal, Freundchen.'},{i:'p1w4',t:'Prost auf deinen kleinen Sieg! 🍺'},{i:'p1w5',t:'Ich hab dich würfeln lassen. Du weißt schon warum.'},{i:'p1w6',t:'Das ist nicht normal… sagst du selbst. 😤'},{i:'p1w7',t:'Ich komme wieder. Verlässlich wie der Morgen.'}],
+     o:[{i:'p1o1',t:'Anfängerglück. 🙄'},{i:'p1o2',t:'Einer war wohl abgelenkt. 😏'},{i:'p1o3',t:'Beim nächsten Mal.'},{i:'p1o4',t:'Prost auf Euren kleinen Sieg! 🍺'},{i:'p1o5',t:'Einer lässt den anderen gewinnen. 😄'},{i:'p1o6',t:'Das ist nicht normal. 😤'},{i:'p1o7',t:'Spannung pur. 👀'}]}
+  ],
+  p2:[
+    {w:[{i:'p2w1',t:'Tja. Was soll ich sagen. 😎'},{i:'p2w2',t:'So sieht Überlegenheit aus. Merke! 🏆'},{i:'p2w3',t:'Ich könnte das ewig so weitermachen.'},{i:'p2w4',t:'Weißt du, wo der Bierkasten steht? 🍺'},{i:'p2w5',t:'War das ein Ausrutscher von dir? 🤷'},{i:'p2w6',t:'Na? Alles gut bei dir? 😏'}],
+     o:[{i:'p2o1',t:'Da hat jemand einen Lauf! 😎'},{i:'p2o2',t:'Das ist schon fast unfair. 🏆'},{i:'p2o3',t:'Jemand schuldet einem anderen ein Bier. 🍺'},{i:'p2o4',t:'War das ein Ausrutscher? 🤷'},{i:'p2o5',t:'Beeindruckend. 👏'}]}
+  ],
+  tie:[
+    {w:[{i:'tiw1',t:'Jetzt sind wir quitt. 🎲'},{i:'tiw2',t:'Ich dachte, du wärst besser.'},{i:'tiw3',t:'Okay, das war nett. Jetzt aber.'},{i:'tiw4',t:'Ich hab dich jetzt. 😤'}],
+     o:[{i:'tio1',t:'Jetzt seid Ihr quitt. 🎲'},{i:'tio2',t:'Ich dachte, einer von Euch wäre besser.'},{i:'tio3',t:'Gleicher Stand. Jetzt wird’s ernst.'},{i:'tio4',t:'Fair ist fair. Nächste Runde entscheidet.'}]}
+  ]
+};
+function showIngoScore(players,ingoPlays){
+  var scores=_getSess().scores;
+  if(!scores||!players||players.length<2) return;
+  var p1=scores[players[0]]||0, p2=scores[players[1]]||0;
+  var scoreStr=players.map(function(n){ return scores[n]||0; }).join(':');
+  var v=ingoPlays?'w':'o';
+  var pool; if(p1===p2) pool=_IC.tie[0][v]; else if(p1>p2) pool=_IC.p1[0][v]; else pool=_IC.p2[0][v];
+  var comment=_pickC(pool);
+  var msg=comment?scoreStr+'\n'+comment:scoreStr;
+  // Warte bis evtl. Spieler-Chat weg ist
+  var delay=_chatHideTimer?5400:0;
+  setTimeout(function(){ showChatMsg('Ingo',msg); },delay);
 }
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
