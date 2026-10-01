@@ -444,7 +444,7 @@ body{-webkit-user-select:none;user-select:none}
    Ein fester Raum. Erster Spieler = Host (Spiel-Engine). Gäste sehen den
    Zustand und senden auf ihrem Zug Signale; der Host wendet sie an.
    ============================================================ */
-const VERSION='v5.95';
+const VERSION='v5.96';
 const P_COLORS=['#ffd400','#53f6ff','#e2231a','#39d98a'];
 function playerColor(i){ return P_COLORS[i%P_COLORS.length]; }
 const TOTAL_LIDS=13;
@@ -1325,8 +1325,8 @@ document.addEventListener('visibilitychange',()=>{
 
 // Chat
 var _lastChatTs=0,_chatHideTimer=null;
-var CHAT_QUICK=['Prost! \u{1F37B}','Schock Doof! \u{1F631}','Zum Wohl! \u{1F942}','Gl\u00FCck gehabt \u{1F605}','Nochmal! \u{1F3B2}','Nicht schlecht \u{1F440}','H\u00E4?? \u{1F914}','Is klar! \u{1F44C}','Interessant! \u{1F9D0}','Letzte Runde! \u{1F514}','Gute Nacht! \u{1F634}','Du Schlawiner! \u{1F608}','Da ist mein Straßenkünstler! \u{1F3A8}','Natürlich! \u{1F60C}','Da geht noch was! \u{1F4AA}','Mein Schock wird höher! \u{1F3B2}','Beförderung zum General! \u{1F3C6}','Das ist nicht normal! \u{1F631}','Ein schöner Tag! \u{2600}','Heute ist Dein Tag! \u{1F389}',"Gibt\'s doch nicht! \u{1F92F}",'Bäähmmm!!! \u{1F4A5}'];
-var CHAT_EMOJI=['\u{1F602}','\u{1F605}','\u{1F631}','\u{1F926}','\u{1F937}','\u{1F634}','\u{1F480}','\u{1F37A}','\u{1F37B}','\u{1F942}','\u{1F389}','\u{1F525}','\u{1F4AA}','\u{1F44D}','\u{1F44E}','\u{1F3B2}','\u{1F3C6}','\u{1F608}','\u{1FAE0}','\u{1F973}','\u{1F929}','\u{1F62D}','\u{1F92E}','\u{1FAF6}','\u{1F633}','\u{1F4A9}','\u{1F44F}','\u{1F484}','\u{2764}','\u{1F44B}'];
+var CHAT_QUICK=['Prost! \u{1F37B}','Schock Doof! \u{1F631}','Zum Wohl! \u{1F942}','Gl\u00FCck gehabt \u{1F605}','Nochmal! \u{1F3B2}','Nicht schlecht \u{1F440}','H\u00E4?? \u{1F914}','Is klar! \u{1F44C}','Interessant! \u{1F9D0}','Letzte Runde! \u{1F514}','Gute Nacht! \u{1F634}','Du Schlawiner! \u{1F608}','Da ist mein Straßenkünstler! \u{1F3A8}','Natürlich! \u{1F60C}','Da geht noch was! \u{1F4AA}','Mein Schock wird höher! \u{1F3B2}','Beförderung zum General! \u{1F3C6}','Das ist nicht normal! \u{1F631}','Ein schöner Tag! \u{2600}','Heute ist Dein Tag! \u{1F389}',"Gibt\'s doch nicht! \u{1F92F}",'Bäähmmm!!! \u{1F4A5}','Achtung, Deckeltrick! \u{1F3AD}'];
+var CHAT_EMOJI=['\u{1F602}','\u{1F605}','\u{1F631}','\u{1F926}','\u{1F937}','\u{1F634}','\u{1F480}','\u{1F37A}','\u{1F37B}','\u{1F942}','\u{1F389}','\u{1F525}','\u{1F4AA}','\u{1F44D}','\u{1F44E}','\u{1F3B2}','\u{1F3C6}','\u{1F608}','\u{1FAE0}','\u{1F973}','\u{1F929}','\u{1F62D}','\u{1F92E}','\u{1FAF6}','\u{1F633}','\u{1F4A9}','\u{1F44F}','\u{1F484}','\u{2764}','\u{1F44B}','\u{1F618}','\u{1F60E}'];
 
 function sendChat(text){
   if(!text||!text.trim()) return;
