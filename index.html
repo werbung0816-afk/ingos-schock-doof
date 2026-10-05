@@ -444,7 +444,7 @@ body{-webkit-user-select:none;user-select:none}
    Ein fester Raum. Erster Spieler = Host (Spiel-Engine). Gäste sehen den
    Zustand und senden auf ihrem Zug Signale; der Host wendet sie an.
    ============================================================ */
-const VERSION='v5.96';
+const VERSION='v5.97';
 const P_COLORS=['#ffd400','#53f6ff','#e2231a','#39d98a'];
 function playerColor(i){ return P_COLORS[i%P_COLORS.length]; }
 const TOTAL_LIDS=13;
@@ -538,6 +538,14 @@ function playSoundCue(cue){
   else if(cue.type==='halfend'||cue.type==='finale') playApplause();
   else if(cue.type==='doubleloss') playChain([oopsAudio,applauseAudio]);
   else if(cue.type==='gameover'||cue.type==='kaiserover') playChain([jingle2Audio,applauseAudio,beerAudio]);
+  // Gäste: Ingo-Score-Kommentar anzeigen (Host macht es in onGameComplete)
+  if(cue.type==='gameover'||cue.type==='kaiserover'||cue.type==='doubleloss'){
+    if(G&&G.over&&G.over.winner!=null&&!isTestName(G.players[G.over.winner].name))
+      addSessWin(G.players[G.over.winner].name);
+    var _sp=G?G.players.filter(function(p){return !isTestName(p.name);}).map(function(p){return p.name;}) :[];
+    var _ingoP=G?G.players.some(function(p){return p.name==='Ingo'&&p.isAI;}):false;
+    if(_sp.length>=2) setTimeout(function(){ showIngoScore(_sp,_ingoP); },6000);
+  }
 }
 // Spielt eine Liste von Audio-Objekten sequentiell ab (jeweils nach Ende des vorherigen)
 function playChain(list){
